@@ -1,1 +1,14 @@
 plan.md
+venv/
+backend/venv/
+*.sqlite3
+__pycache__/
+*.pyc
+.vscode/
+.env
+node_modules/
+dist/
+build/
+config/__pycache__/
+accounts/__pycache__/
+accounts/migrations
