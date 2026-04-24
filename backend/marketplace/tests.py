@@ -4,6 +4,8 @@ from rest_framework.test import APITestCase
 from rest_framework import status
 from django.contrib.auth import get_user_model
 from .models import Category, Service, Booking
+from django.test.utils import CaptureQueriesContext
+from django.db import connection
 
 User = get_user_model()
 
@@ -159,3 +161,24 @@ class MarketplaceAPITests(APITestCase):
         response = self.client.delete(self.detail_url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(Service.objects.count(), 0)
+
+    def test_service_list_optimization(self):
+        # Create multiple services to make N+1 obvious if it existed
+        for i in range(10):
+            Service.objects.create(
+                provider=self.provider,
+                category=self.category,
+                title=f"Service {i}",
+                price=10.00
+            )
+
+        # With select_related, it should be 1 query for all services + relations
+        # (plus any internal DRF/Django auth queries if any, but we focus on the main fetch)
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(self.list_url)
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # 1 query to fetch services with joined provider and category
+        # There might be a few more for session/auth depending on setup, 
+        # but N+1 would result in 20+ additional queries here.
+        self.assertLess(len(queries), 5) 
