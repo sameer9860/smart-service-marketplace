@@ -8,7 +8,7 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.AllowAny]
 
 class ServiceViewSet(viewsets.ModelViewSet):
-    queryset = Service.objects.all()
+    queryset = Service.objects.select_related('provider', 'category').all()
     serializer_class = ServiceSerializer
 
     def get_permissions(self):
