@@ -22,3 +22,12 @@ urlpatterns = [
     path('api/', include('accounts.urls')),
     path('api/', include('marketplace.urls')),
 ]
+
+from django.conf import settings
+
+if settings.DEBUG:
+    import debug_toolbar
+    urlpatterns += [
+        path('__debug__/', include(debug_toolbar.urls)),
+    ]
+
