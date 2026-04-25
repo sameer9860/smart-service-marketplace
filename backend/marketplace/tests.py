@@ -163,7 +163,6 @@ class MarketplaceAPITests(APITestCase):
         self.assertEqual(Service.objects.count(), 0)
 
     def test_service_list_optimization(self):
-        # Create multiple services to make N+1 obvious if it existed
         for i in range(10):
             Service.objects.create(
                 provider=self.provider,
@@ -171,14 +170,67 @@ class MarketplaceAPITests(APITestCase):
                 title=f"Service {i}",
                 price=10.00
             )
-
-        # With select_related, it should be 1 query for all services + relations
-        # (plus any internal DRF/Django auth queries if any, but we focus on the main fetch)
         with CaptureQueriesContext(connection) as queries:
             response = self.client.get(self.list_url)
             self.assertEqual(response.status_code, status.HTTP_200_OK)
-        
-        # 1 query to fetch services with joined provider and category
-        # There might be a few more for session/auth depending on setup, 
-        # but N+1 would result in 20+ additional queries here.
         self.assertLess(len(queries), 5) 
+
+class BookingAPITests(APITestCase):
+
+    def setUp(self):
+        self.provider = User.objects.create_user(
+            email="booking_provider@test.com",
+            password="password123",
+            role="provider"
+        )
+        self.customer = User.objects.create_user(
+            email="booking_customer@test.com",
+            password="password123",
+            role="customer"
+        )
+        self.category = Category.objects.create(name="Plumbing")
+        self.service = Service.objects.create(
+            provider=self.provider,
+            category=self.category,
+            title="Fix Leak",
+            price=50.00
+        )
+        self.booking_url = reverse('booking-list')
+
+    def test_create_booking_authenticated(self):
+        self.client.force_authenticate(user=self.customer)
+        data = {"service": self.service.id}
+        response = self.client.post(self.booking_url, data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Booking.objects.count(), 1)
+        self.assertEqual(response.data['user'], self.customer.id)
+        self.assertEqual(response.data['status'], 'pending')
+
+    def test_create_booking_unauthenticated(self):
+        data = {"service": self.service.id}
+        response = self.client.post(self.booking_url, data)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_list_my_bookings(self):
+        # Create a booking for self.customer
+        Booking.objects.create(user=self.customer, service=self.service)
+        
+        # Another user's booking
+        other_user = User.objects.create_user(email="other@test.com", password="password")
+        Booking.objects.create(user=other_user, service=self.service)
+
+        self.client.force_authenticate(user=self.customer)
+        response = self.client.get(self.booking_url)
+        # Should only see 1 (their own) + any they provide (none yet)
+        # Actually, in the viewset logic: (user=user) | (service__provider=user)
+        # self.customer is not the provider, so they only see 1.
+        self.assertEqual(len(response.data), 1)
+
+    def test_provider_sees_bookings(self):
+        Booking.objects.create(user=self.customer, service=self.service)
+        
+        self.client.force_authenticate(user=self.provider)
+        response = self.client.get(self.booking_url)
+        # Provider should see the booking for their service
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['service_title'], "Fix Leak")
