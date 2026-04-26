@@ -50,7 +50,9 @@ class Booking(models.Model):
     service = models.ForeignKey(
         Service, 
         on_delete=models.CASCADE, 
-        related_name='bookings'
+        related_name='bookings',
+        null=True,
+        blank=True
     )
     status = models.CharField(
         max_length=20, 
