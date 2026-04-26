@@ -1,5 +1,7 @@
-from django.db import models
+from django.db import models, transaction
 from rest_framework import viewsets, permissions, exceptions
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from .models import Category, Service, Booking, Job, Bid
 from .serializers import (
     CategorySerializer, ServiceSerializer, BookingSerializer, 
@@ -64,9 +66,50 @@ class BidViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     def get_queryset(self):
-        # Customers see bids for their jobs
-        # Providers see their own bids
         user = self.request.user
         return Bid.objects.filter(
             models.Q(provider=user) | models.Q(job__customer=user)
         ).select_related('job', 'provider')
+
+    @action(detail=True, methods=['post'])
+    def accept_bid(self, request, pk=None):
+        bid = self.get_object()
+        
+        # Only job customer can accept bids
+        if bid.job.customer != request.user:
+            raise exceptions.PermissionDenied("You are not the customer of this job.")
+        
+        if bid.job.status != 'open':
+            raise exceptions.ValidationError("This job is no longer open for bidding.")
+
+        with transaction.atomic():
+            # Accept this bid
+            bid.status = 'accepted'
+            bid.save()
+            
+            # Reject all other bids for this job
+            bid.job.bids.exclude(id=bid.id).update(status='rejected')
+            
+            # Close the job
+            bid.job.status = 'closed'
+            bid.job.save()
+            
+            # Create a booking
+            Booking.objects.create(
+                user=bid.job.customer,
+                service=None,  # Or logic to link to a generic service if needed
+                status='confirmed'
+            )
+            
+        return Response({'status': 'bid accepted and booking created'})
+
+    @action(detail=True, methods=['post'])
+    def reject_bid(self, request, pk=None):
+        bid = self.get_object()
+        
+        if bid.job.customer != request.user:
+            raise exceptions.PermissionDenied("You are not the customer of this job.")
+            
+        bid.status = 'rejected'
+        bid.save()
+        return Response({'status': 'bid rejected'})
