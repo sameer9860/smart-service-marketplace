@@ -3,7 +3,7 @@ from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
 from django.contrib.auth import get_user_model
-from .models import Category, Service, Booking
+from .models import Category, Service, Booking, Job, Bid
 from django.test.utils import CaptureQueriesContext
 from django.db import connection
 
@@ -212,25 +212,80 @@ class BookingAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_list_my_bookings(self):
-        # Create a booking for self.customer
         Booking.objects.create(user=self.customer, service=self.service)
-        
-        # Another user's booking
         other_user = User.objects.create_user(email="other@test.com", password="password")
         Booking.objects.create(user=other_user, service=self.service)
 
         self.client.force_authenticate(user=self.customer)
         response = self.client.get(self.booking_url)
-        # Should only see 1 (their own) + any they provide (none yet)
-        # Actually, in the viewset logic: (user=user) | (service__provider=user)
-        # self.customer is not the provider, so they only see 1.
         self.assertEqual(len(response.data), 1)
 
     def test_provider_sees_bookings(self):
         Booking.objects.create(user=self.customer, service=self.service)
-        
         self.client.force_authenticate(user=self.provider)
         response = self.client.get(self.booking_url)
-        # Provider should see the booking for their service
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['service_title'], "Fix Leak")
+
+class JobAndBidAPITests(APITestCase):
+
+    def setUp(self):
+        self.customer = User.objects.create_user(
+            email="job_customer@test.com",
+            password="password123",
+            role="customer"
+        )
+        self.provider = User.objects.create_user(
+            email="bid_provider@test.com",
+            password="password123",
+            role="provider"
+        )
+        self.job_url = reverse('job-list')
+        self.bid_url = reverse('bid-list')
+
+    def test_customer_can_post_job(self):
+        self.client.force_authenticate(user=self.customer)
+        data = {
+            "title": "Paint Room",
+            "description": "Need to paint my living room",
+            "budget": "200.00"
+        }
+        response = self.client.post(self.job_url, data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Job.objects.count(), 1)
+
+    def test_provider_cannot_post_job(self):
+        self.client.force_authenticate(user=self.provider)
+        data = {"title": "Test", "description": "Test", "budget": "100.00"}
+        response = self.client.post(self.job_url, data)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_provider_can_bid(self):
+        job = Job.objects.create(customer=self.customer, title="Job", description="Desc", budget=100)
+        self.client.force_authenticate(user=self.provider)
+        data = {
+            "job": job.id,
+            "amount": "90.00",
+            "message": "I can do it"
+        }
+        response = self.client.post(self.bid_url, data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Bid.objects.count(), 1)
+
+    def test_customer_cannot_bid(self):
+        job = Job.objects.create(customer=self.customer, title="Job", description="Desc", budget=100)
+        self.client.force_authenticate(user=self.customer)
+        data = {"job": job.id, "amount": "80.00", "message": "Illegal bid"}
+        response = self.client.post(self.bid_url, data)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_duplicate_bid_prevention(self):
+        job = Job.objects.create(customer=self.customer, title="Job", description="Desc", budget=100)
+        self.client.force_authenticate(user=self.provider)
+        data = {"job": job.id, "amount": "90.00", "message": "Bid 1"}
+        self.client.post(self.bid_url, data)
+        
+        # Second bid on same job
+        response = self.client.post(self.bid_url, data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Bid.objects.count(), 1)
