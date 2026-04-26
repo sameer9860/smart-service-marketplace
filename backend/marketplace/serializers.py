@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Category, Service, Booking
+from .models import Category, Service, Booking, Job, Bid
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -36,4 +36,29 @@ class BookingSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         # Automatically set user to current logged-in user
         validated_data['user'] = self.context['request'].user
+        return super().create(validated_data)
+
+class JobSerializer(serializers.ModelSerializer):
+    customer_email = serializers.ReadOnlyField(source='customer.email')
+
+    class Meta:
+        model = Job
+        fields = ['id', 'customer', 'customer_email', 'title', 'description', 'budget', 'status', 'created_at']
+        read_only_fields = ['customer', 'status', 'created_at']
+
+    def create(self, validated_data):
+        validated_data['customer'] = self.context['request'].user
+        return super().create(validated_data)
+
+class BidSerializer(serializers.ModelSerializer):
+    provider_email = serializers.ReadOnlyField(source='provider.email')
+    job_title = serializers.ReadOnlyField(source='job.title')
+
+    class Meta:
+        model = Bid
+        fields = ['id', 'job', 'job_title', 'provider', 'provider_email', 'amount', 'message', 'status', 'created_at']
+        read_only_fields = ['provider', 'status', 'created_at']
+
+    def create(self, validated_data):
+        validated_data['provider'] = self.context['request'].user
         return super().create(validated_data)
