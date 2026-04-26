@@ -289,3 +289,36 @@ class JobAndBidAPITests(APITestCase):
         response = self.client.post(self.bid_url, data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(Bid.objects.count(), 1)
+
+    def test_accept_bid_workflow(self):
+        job = Job.objects.create(customer=self.customer, title="Job", description="Desc", budget=100)
+        bid = Bid.objects.create(job=job, provider=self.provider, amount=90, message="Hi")
+        other_provider = User.objects.create_user(email="other_p@test.com", password="password", role="provider")
+        other_bid = Bid.objects.create(job=job, provider=other_provider, amount=95, message="Hello")
+
+        self.client.force_authenticate(user=self.customer)
+        url = reverse('bid-accept-bid', kwargs={'pk': bid.pk})
+        response = self.client.post(url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        bid.refresh_from_db()
+        other_bid.refresh_from_db()
+        job.refresh_from_db()
+        
+        self.assertEqual(bid.status, 'accepted')
+        self.assertEqual(other_bid.status, 'rejected')
+        self.assertEqual(job.status, 'closed')
+        self.assertEqual(Booking.objects.count(), 1)
+
+    def test_reject_bid(self):
+        job = Job.objects.create(customer=self.customer, title="Job", description="Desc", budget=100)
+        bid = Bid.objects.create(job=job, provider=self.provider, amount=90, message="Hi")
+
+        self.client.force_authenticate(user=self.customer)
+        url = reverse('bid-reject-bid', kwargs={'pk': bid.pk})
+        response = self.client.post(url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        bid.refresh_from_db()
+        self.assertEqual(bid.status, 'rejected')
