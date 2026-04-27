@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Category, Service, Booking, Job, Bid, Review
+from .models import Category, Service, Booking, Job, Bid, Review, Notification
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -74,3 +74,9 @@ class ReviewSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data['user'] = self.context['request'].user
         return super().create(validated_data)
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ['id', 'message', 'is_read', 'created_at']
+        read_only_fields = ['id', 'message', 'is_read', 'created_at']
