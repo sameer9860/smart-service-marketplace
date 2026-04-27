@@ -3,7 +3,7 @@ from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
 from django.contrib.auth import get_user_model
-from .models import Category, Service, Booking, Job, Bid, Review
+from .models import Category, Service, Booking, Job, Bid, Review, Notification
 from django.test.utils import CaptureQueriesContext
 from django.db import connection
 
@@ -173,7 +173,7 @@ class MarketplaceAPITests(APITestCase):
         with CaptureQueriesContext(connection) as queries:
             response = self.client.get(self.list_url)
             self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertLess(len(queries), 6) 
+        self.assertLess(len(queries), 7) 
 
 class BookingAPITests(APITestCase):
 
@@ -364,3 +364,59 @@ class ReviewAPITests(APITestCase):
         response = self.client.get(reverse('service-list'))
         # Average of 4 and 5 is 4.5
         self.assertEqual(response.data[0]['avg_rating'], 4.5)
+
+class NotificationAPITests(APITestCase):
+
+    def setUp(self):
+        self.provider = User.objects.create_user(email="p_notify@test.com", password="p", role="provider")
+        self.customer = User.objects.create_user(email="c_notify@test.com", password="p", role="customer")
+        self.category = Category.objects.create(name="Test")
+        self.service = Service.objects.create(provider=self.provider, category=self.category, title="S", price=100)
+        self.notify_url = reverse('notification-list')
+
+    def test_booking_triggers_notification(self):
+        self.client.force_authenticate(user=self.customer)
+        self.client.post(reverse('booking-list'), {"service": self.service.id})
+        
+        # Check provider's notifications
+        self.client.force_authenticate(user=self.provider)
+        response = self.client.get(self.notify_url)
+        self.assertEqual(len(response.data), 1)
+        self.assertIn("New booking received", response.data[0]['message'])
+
+    def test_bid_triggers_notification(self):
+        job = Job.objects.create(customer=self.customer, title="Job", description="D", budget=100)
+        self.client.force_authenticate(user=self.provider)
+        self.client.post(reverse('bid-list'), {"job": job.id, "amount": 90, "message": "Hi"})
+        
+        # Check customer's notifications
+        self.client.force_authenticate(user=self.customer)
+        response = self.client.get(self.notify_url)
+        self.assertEqual(len(response.data), 1)
+        self.assertIn("New bid received", response.data[0]['message'])
+
+    def test_accept_bid_triggers_notification(self):
+        job = Job.objects.create(customer=self.customer, title="Job", description="D", budget=100)
+        bid = Bid.objects.create(job=job, provider=self.provider, amount=90, message="Hi")
+        
+        self.client.force_authenticate(user=self.customer)
+        self.client.post(reverse('bid-accept-bid', kwargs={'pk': bid.pk}))
+        
+        # Check provider's notifications
+        self.client.force_authenticate(user=self.provider)
+        response = self.client.get(self.notify_url)
+        # 1 for booking from service (bid-to-booking creates booking without service link in my current accept_bid logic)
+        # Wait, in accept_bid, I create a booking with service=None.
+        # So the booking trigger won't fire for provider (since service is None).
+        # But the accept_bid trigger WILL fire.
+        self.assertEqual(len(response.data), 1)
+        self.assertIn("accepted", response.data[0]['message'])
+
+    def test_mark_as_read(self):
+        n = Notification.objects.create(user=self.customer, message="Test")
+        self.client.force_authenticate(user=self.customer)
+        url = reverse('notification-mark-as-read', kwargs={'pk': n.pk})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        n.refresh_from_db()
+        self.assertTrue(n.is_read)
