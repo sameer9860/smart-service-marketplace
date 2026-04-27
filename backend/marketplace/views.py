@@ -1,11 +1,12 @@
 from django.db import models, transaction
+from django.db.models import Avg
 from rest_framework import viewsets, permissions, exceptions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Category, Service, Booking, Job, Bid
+from .models import Category, Service, Booking, Job, Bid, Review
 from .serializers import (
     CategorySerializer, ServiceSerializer, BookingSerializer, 
-    JobSerializer, BidSerializer
+    JobSerializer, BidSerializer, ReviewSerializer
 )
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -14,7 +15,9 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.AllowAny]
 
 class ServiceViewSet(viewsets.ModelViewSet):
-    queryset = Service.objects.select_related('provider', 'category').all()
+    queryset = Service.objects.select_related('provider', 'category').annotate(
+        avg_rating=Avg('reviews__rating')
+    ).all()
     serializer_class = ServiceSerializer
 
     def get_permissions(self):
@@ -74,42 +77,50 @@ class BidViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def accept_bid(self, request, pk=None):
         bid = self.get_object()
-        
-        # Only job customer can accept bids
         if bid.job.customer != request.user:
             raise exceptions.PermissionDenied("You are not the customer of this job.")
-        
         if bid.job.status != 'open':
             raise exceptions.ValidationError("This job is no longer open for bidding.")
 
         with transaction.atomic():
-            # Accept this bid
             bid.status = 'accepted'
             bid.save()
-            
-            # Reject all other bids for this job
             bid.job.bids.exclude(id=bid.id).update(status='rejected')
-            
-            # Close the job
             bid.job.status = 'closed'
             bid.job.save()
-            
-            # Create a booking
             Booking.objects.create(
                 user=bid.job.customer,
-                service=None,  # Or logic to link to a generic service if needed
+                service=None,
                 status='confirmed'
             )
-            
         return Response({'status': 'bid accepted and booking created'})
 
     @action(detail=True, methods=['post'])
     def reject_bid(self, request, pk=None):
         bid = self.get_object()
-        
         if bid.job.customer != request.user:
             raise exceptions.PermissionDenied("You are not the customer of this job.")
-            
         bid.status = 'rejected'
         bid.save()
         return Response({'status': 'bid rejected'})
+
+class ReviewViewSet(viewsets.ModelViewSet):
+    queryset = Review.objects.select_related('user', 'service').all()
+    serializer_class = ReviewSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        service = serializer.validated_data['service']
+        
+        # Check if user has a completed booking for this service
+        has_completed_booking = Booking.objects.filter(
+            user=user,
+            service=service,
+            status='completed'
+        ).exists()
+        
+        if not has_completed_booking:
+            raise exceptions.ValidationError("You can only review services you have successfully completed.")
+            
+        serializer.save()
