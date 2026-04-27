@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Category, Service, Booking, Job, Bid
+from .models import Category, Service, Booking, Job, Bid, Review
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -7,17 +7,17 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class ServiceSerializer(serializers.ModelSerializer):
-    # Optional: include read-only category name or provider email
     category_name = serializers.ReadOnlyField(source='category.name')
     provider_email = serializers.ReadOnlyField(source='provider.email')
+    avg_rating = serializers.FloatField(read_only=True)
 
     class Meta:
         model = Service
         fields = [
             'id', 'provider', 'provider_email', 'category', 'category_name', 
-            'title', 'description', 'price', 'created_at'
+            'title', 'description', 'price', 'created_at', 'avg_rating'
         ]
-        read_only_fields = ['provider', 'created_at']
+        read_only_fields = ['provider', 'created_at', 'avg_rating']
 
     def create(self, validated_data):
         # Automatically set provider to current user
@@ -61,4 +61,16 @@ class BidSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data['provider'] = self.context['request'].user
+        return super().create(validated_data)
+
+class ReviewSerializer(serializers.ModelSerializer):
+    user_email = serializers.ReadOnlyField(source='user.email')
+
+    class Meta:
+        model = Review
+        fields = ['id', 'user', 'user_email', 'service', 'rating', 'comment', 'created_at']
+        read_only_fields = ['user', 'created_at']
+
+    def create(self, validated_data):
+        validated_data['user'] = self.context['request'].user
         return super().create(validated_data)
