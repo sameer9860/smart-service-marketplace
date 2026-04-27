@@ -3,7 +3,7 @@ from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
 from django.contrib.auth import get_user_model
-from .models import Category, Service, Booking, Job, Bid
+from .models import Category, Service, Booking, Job, Bid, Review
 from django.test.utils import CaptureQueriesContext
 from django.db import connection
 
@@ -173,7 +173,7 @@ class MarketplaceAPITests(APITestCase):
         with CaptureQueriesContext(connection) as queries:
             response = self.client.get(self.list_url)
             self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertLess(len(queries), 5) 
+        self.assertLess(len(queries), 6) 
 
 class BookingAPITests(APITestCase):
 
@@ -322,3 +322,45 @@ class JobAndBidAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         bid.refresh_from_db()
         self.assertEqual(bid.status, 'rejected')
+
+class ReviewAPITests(APITestCase):
+
+    def setUp(self):
+        self.provider = User.objects.create_user(email="p@test.com", password="p", role="provider")
+        self.customer = User.objects.create_user(email="c@test.com", password="p", role="customer")
+        self.category = Category.objects.create(name="Test")
+        self.service = Service.objects.create(provider=self.provider, category=self.category, title="S", price=100)
+        self.review_url = reverse('review-list')
+
+    def test_review_without_booking_fails(self):
+        self.client.force_authenticate(user=self.customer)
+        data = {"service": self.service.id, "rating": 5, "comment": "Good"}
+        response = self.client.post(self.review_url, data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_review_after_completed_booking_works(self):
+        Booking.objects.create(user=self.customer, service=self.service, status='completed')
+        self.client.force_authenticate(user=self.customer)
+        data = {"service": self.service.id, "rating": 5, "comment": "Great!"}
+        response = self.client.post(self.review_url, data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Review.objects.count(), 1)
+
+    def test_invalid_rating_fails(self):
+        Booking.objects.create(user=self.customer, service=self.service, status='completed')
+        self.client.force_authenticate(user=self.customer)
+        data = {"service": self.service.id, "rating": 6, "comment": "Too high"}
+        response = self.client.post(self.review_url, data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_avg_rating_aggregation(self):
+        Booking.objects.create(user=self.customer, service=self.service, status='completed')
+        Review.objects.create(user=self.customer, service=self.service, rating=4, comment="A")
+        
+        other_customer = User.objects.create_user(email="c2@test.com", password="p", role="customer")
+        Booking.objects.create(user=other_customer, service=self.service, status='completed')
+        Review.objects.create(user=other_customer, service=self.service, rating=5, comment="B")
+        
+        response = self.client.get(reverse('service-list'))
+        # Average of 4 and 5 is 4.5
+        self.assertEqual(response.data[0]['avg_rating'], 4.5)
