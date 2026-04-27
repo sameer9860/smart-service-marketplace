@@ -3,10 +3,10 @@ from django.db.models import Avg
 from rest_framework import viewsets, permissions, exceptions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Category, Service, Booking, Job, Bid, Review
+from .models import Category, Service, Booking, Job, Bid, Review, Notification
 from .serializers import (
     CategorySerializer, ServiceSerializer, BookingSerializer, 
-    JobSerializer, BidSerializer, ReviewSerializer
+    JobSerializer, BidSerializer, ReviewSerializer, NotificationSerializer
 )
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
@@ -43,6 +43,15 @@ class BookingViewSet(viewsets.ModelViewSet):
             models.Q(user=user) | models.Q(service__provider=user)
         ).select_related('user', 'service').distinct()
 
+    def perform_create(self, serializer):
+        booking = serializer.save()
+        # Trigger Notification for Provider
+        if booking.service:
+            Notification.objects.create(
+                user=booking.service.provider,
+                message=f"New booking received for {booking.service.title} from {booking.user.email}."
+            )
+
 class JobViewSet(viewsets.ModelViewSet):
     queryset = Job.objects.select_related('customer').all()
     serializer_class = JobSerializer
@@ -66,7 +75,12 @@ class BidViewSet(viewsets.ModelViewSet):
         if Bid.objects.filter(job=job, provider=self.request.user).exists():
             raise exceptions.ValidationError("You have already bid on this job.")
             
-        serializer.save()
+        bid = serializer.save()
+        # Trigger Notification for Customer
+        Notification.objects.create(
+            user=job.customer,
+            message=f"New bid received on your job '{job.title}' from {bid.provider.email}."
+        )
 
     def get_queryset(self):
         user = self.request.user
@@ -88,11 +102,19 @@ class BidViewSet(viewsets.ModelViewSet):
             bid.job.bids.exclude(id=bid.id).update(status='rejected')
             bid.job.status = 'closed'
             bid.job.save()
-            Booking.objects.create(
+            
+            booking = Booking.objects.create(
                 user=bid.job.customer,
                 service=None,
                 status='confirmed'
             )
+            
+            # Trigger Notification for winning Provider
+            Notification.objects.create(
+                user=bid.provider,
+                message=f"Your bid for '{bid.job.title}' has been accepted!"
+            )
+            
         return Response({'status': 'bid accepted and booking created'})
 
     @action(detail=True, methods=['post'])
@@ -113,7 +135,6 @@ class ReviewViewSet(viewsets.ModelViewSet):
         user = self.request.user
         service = serializer.validated_data['service']
         
-        # Check if user has a completed booking for this service
         has_completed_booking = Booking.objects.filter(
             user=user,
             service=service,
@@ -124,3 +145,18 @@ class ReviewViewSet(viewsets.ModelViewSet):
             raise exceptions.ValidationError("You can only review services you have successfully completed.")
             
         serializer.save()
+
+class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Notification.objects.all()
+    serializer_class = NotificationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Notification.objects.filter(user=self.request.user).order_by('-created_at')
+
+    @action(detail=True, methods=['post'])
+    def mark_as_read(self, request, pk=None):
+        notification = self.get_object()
+        notification.is_read = True
+        notification.save()
+        return Response({'status': 'notification marked as read'})
