@@ -8,6 +8,7 @@ from .serializers import (
     CategorySerializer, ServiceSerializer, BookingSerializer, 
     JobSerializer, BidSerializer, ReviewSerializer, NotificationSerializer
 )
+from .tasks import send_notification_task
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Category.objects.all()
@@ -47,9 +48,9 @@ class BookingViewSet(viewsets.ModelViewSet):
         booking = serializer.save()
         # Trigger Notification for Provider
         if booking.service:
-            Notification.objects.create(
-                user=booking.service.provider,
-                message=f"New booking received for {booking.service.title} from {booking.user.email}."
+            send_notification_task.delay(
+                booking.service.provider.id,
+                f"New booking received for {booking.service.title} from {booking.user.email}."
             )
 
 class JobViewSet(viewsets.ModelViewSet):
@@ -77,9 +78,9 @@ class BidViewSet(viewsets.ModelViewSet):
             
         bid = serializer.save()
         # Trigger Notification for Customer
-        Notification.objects.create(
-            user=job.customer,
-            message=f"New bid received on your job '{job.title}' from {bid.provider.email}."
+        send_notification_task.delay(
+            job.customer.id,
+            f"New bid received on your job '{job.title}' from {bid.provider.email}."
         )
 
     def get_queryset(self):
@@ -110,9 +111,9 @@ class BidViewSet(viewsets.ModelViewSet):
             )
             
             # Trigger Notification for winning Provider
-            Notification.objects.create(
-                user=bid.provider,
-                message=f"Your bid for '{bid.job.title}' has been accepted!"
+            send_notification_task.delay(
+                bid.provider.id,
+                f"Your bid for '{bid.job.title}' has been accepted!"
             )
             
         return Response({'status': 'bid accepted and booking created'})
