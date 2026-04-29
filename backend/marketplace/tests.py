@@ -104,7 +104,7 @@ class MarketplaceAPITests(APITestCase):
     def test_list_services(self):
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data['results']), 1)
 
     def test_create_service_unauthenticated(self):
         data = {
@@ -140,13 +140,13 @@ class MarketplaceAPITests(APITestCase):
         
         # Filter by Plumbing
         response = self.client.get(f"{self.list_url}?category={self.category.id}")
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['title'], "Fix Leak")
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['title'], "Fix Leak")
 
         # Filter by Cleaning
         response = self.client.get(f"{self.list_url}?category={new_cat.id}")
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['title'], "Clean House")
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['title'], "Clean House")
 
     def test_update_service(self):
         self.client.force_authenticate(user=self.provider)
@@ -218,14 +218,14 @@ class BookingAPITests(APITestCase):
 
         self.client.force_authenticate(user=self.customer)
         response = self.client.get(self.booking_url)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data['results']), 1)
 
     def test_provider_sees_bookings(self):
         Booking.objects.create(user=self.customer, service=self.service)
         self.client.force_authenticate(user=self.provider)
         response = self.client.get(self.booking_url)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['service_title'], "Fix Leak")
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['service_title'], "Fix Leak")
 
 class JobAndBidAPITests(APITestCase):
 
@@ -363,7 +363,7 @@ class ReviewAPITests(APITestCase):
         
         response = self.client.get(reverse('service-list'))
         # Average of 4 and 5 is 4.5
-        self.assertEqual(response.data[0]['avg_rating'], 4.5)
+        self.assertEqual(response.data['results'][0]['avg_rating'], 4.5)
 
 class NotificationAPITests(APITestCase):
 
@@ -381,8 +381,8 @@ class NotificationAPITests(APITestCase):
         # Check provider's notifications
         self.client.force_authenticate(user=self.provider)
         response = self.client.get(self.notify_url)
-        self.assertEqual(len(response.data), 1)
-        self.assertIn("New booking received", response.data[0]['message'])
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertIn("New booking received", response.data['results'][0]['message'])
 
     def test_bid_triggers_notification(self):
         job = Job.objects.create(customer=self.customer, title="Job", description="D", budget=100)
@@ -392,8 +392,8 @@ class NotificationAPITests(APITestCase):
         # Check customer's notifications
         self.client.force_authenticate(user=self.customer)
         response = self.client.get(self.notify_url)
-        self.assertEqual(len(response.data), 1)
-        self.assertIn("New bid received", response.data[0]['message'])
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertIn("New bid received", response.data['results'][0]['message'])
 
     def test_accept_bid_triggers_notification(self):
         job = Job.objects.create(customer=self.customer, title="Job", description="D", budget=100)
@@ -409,8 +409,8 @@ class NotificationAPITests(APITestCase):
         # Wait, in accept_bid, I create a booking with service=None.
         # So the booking trigger won't fire for provider (since service is None).
         # But the accept_bid trigger WILL fire.
-        self.assertEqual(len(response.data), 1)
-        self.assertIn("accepted", response.data[0]['message'])
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertIn("accepted", response.data['results'][0]['message'])
 
     def test_mark_as_read(self):
         n = Notification.objects.create(user=self.customer, message="Test")
