@@ -28,6 +28,7 @@ class Service(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        ordering = ['-created_at']
         indexes = [
             models.Index(fields=['category']),
             models.Index(fields=['price']),
@@ -62,6 +63,9 @@ class Booking(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ['-created_at']
+
     def __str__(self):
         return f"{self.user.email} - {self.service.title if self.service else 'Job-based'} ({self.status})"
 
@@ -82,6 +86,9 @@ class Job(models.Model):
     budget = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
 
     def __str__(self):
         return self.title
@@ -109,6 +116,7 @@ class Bid(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        ordering = ['-created_at']
         constraints = [
             models.UniqueConstraint(fields=['job', 'provider'], name='unique_bid_per_provider')
         ]
@@ -134,6 +142,7 @@ class Review(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        ordering = ['-created_at']
         unique_together = ['user', 'service']
 
     def __str__(self):
@@ -148,6 +157,9 @@ class Notification(models.Model):
     message = models.TextField()
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
 
     def __str__(self):
         return f"Notification for {self.user.email}: {self.message[:20]}..."
