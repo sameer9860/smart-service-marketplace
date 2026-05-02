@@ -1,6 +1,6 @@
 from django.db import models, transaction
 from django.db.models import Avg
-from rest_framework import viewsets, permissions, exceptions
+from rest_framework import viewsets, permissions, exceptions, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Category, Service, Booking, Job, Bid, Review, Notification
@@ -14,12 +14,20 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     permission_classes = [permissions.AllowAny]
+    authentication_classes = [] # Allow guest access without token validation
 
 class ServiceViewSet(viewsets.ModelViewSet):
     queryset = Service.objects.select_related('provider', 'category').annotate(
         avg_rating=Avg('reviews__rating')
     ).all()
     serializer_class = ServiceSerializer
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['title', 'description']
+
+    def get_authenticators(self):
+        if self.action in ['list', 'retrieve']:
+            return []
+        return super().get_authenticators()
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
