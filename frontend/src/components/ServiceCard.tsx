@@ -1,7 +1,8 @@
 "use client";
 
 import React from 'react';
-import { Star, User, Clock, ChevronRight } from 'lucide-react';
+import { Star, User, ExternalLink } from 'lucide-react';
+import Link from 'next/link';
 
 interface ServiceCardProps {
   service: {
@@ -36,29 +37,33 @@ export default function ServiceCard({ service }: ServiceCardProps) {
           {service.description}
         </p>
 
-        <div className="flex items-center gap-3 pt-4 border-t border-white/5 mt-auto">
-          <div className="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center">
-            <User className="w-4 h-4 text-neutral-500" />
+        <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/5">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center">
+              <User className="w-4 h-4 text-neutral-500" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] text-neutral-500 uppercase">Provider</span>
+              <span className="text-xs text-neutral-300 font-medium truncate max-w-[100px]">
+                {service.provider_email}
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="text-xs text-neutral-500">Provider</span>
-            <span className="text-xs text-neutral-300 font-medium truncate max-w-[120px]">
-              {service.provider_email}
-            </span>
+          <div className="text-right">
+            <span className="block text-[10px] text-neutral-500 uppercase">Starting at</span>
+            <span className="text-lg font-bold text-white">${service.price}</span>
           </div>
         </div>
       </div>
 
-      <div className="p-6 pt-0">
-        <div className="flex items-center justify-between mt-4">
-          <div className="flex flex-col">
-            <span className="text-xs text-neutral-500 uppercase tracking-wider">Starting at</span>
-            <span className="text-2xl font-bold text-white">${service.price}</span>
-          </div>
-          <button className="bg-white/5 hover:bg-blue-600 text-white p-3 rounded-xl transition-all duration-300 group/btn">
-            <ChevronRight className="w-5 h-5 group-hover/btn:translate-x-0.5 transition-transform" />
-          </button>
-        </div>
+      <div className="p-6 pt-0 mt-auto">
+        <Link 
+          href={`/services/${service.id}`}
+          className="w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-blue-600 hover:text-white transition-all duration-300 flex items-center justify-center gap-2"
+        >
+          View Details
+          <ExternalLink className="w-4 h-4" />
+        </Link>
       </div>
     </div>
   );
