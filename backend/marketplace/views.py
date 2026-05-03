@@ -65,6 +65,24 @@ class BookingViewSet(viewsets.ModelViewSet):
                 f"New booking received for {booking.service.title} from {booking.user.email}."
             )
 
+    @action(detail=True, methods=['post'])
+    def confirm_booking(self, request, pk=None):
+        booking = self.get_object()
+        if booking.service.provider != request.user:
+            raise exceptions.PermissionDenied("You are not the provider of this service.")
+        booking.status = 'confirmed'
+        booking.save()
+        return Response({'status': 'booking confirmed'})
+
+    @action(detail=True, methods=['post'])
+    def complete_booking(self, request, pk=None):
+        booking = self.get_object()
+        if booking.service.provider != request.user:
+            raise exceptions.PermissionDenied("You are not the provider of this service.")
+        booking.status = 'completed'
+        booking.save()
+        return Response({'status': 'booking completed'})
+
 class JobViewSet(viewsets.ModelViewSet):
     queryset = Job.objects.select_related('customer').all()
     serializer_class = JobSerializer
