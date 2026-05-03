@@ -14,3 +14,4 @@ backend/accounts/__pycache__/
 backend/accounts/migrations
 backend/marketplace/__pycache__/
 backend/marketplace/migrations
+logo.png
