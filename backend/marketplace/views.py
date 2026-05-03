@@ -1,6 +1,7 @@
 from django.db import models, transaction
 from django.db.models import Avg
 from rest_framework import viewsets, permissions, exceptions, filters
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Category, Service, Booking, Job, Bid, Review, Notification
@@ -9,6 +10,13 @@ from .serializers import (
     JobSerializer, BidSerializer, ReviewSerializer, NotificationSerializer
 )
 from .tasks import send_notification_task
+
+class LenientJWTAuthentication(JWTAuthentication):
+    def authenticate(self, request):
+        try:
+            return super().authenticate(request)
+        except Exception:
+            return None
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Category.objects.all()
@@ -23,11 +31,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
     serializer_class = ServiceSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ['title', 'description']
-
-    def get_authenticators(self):
-        if self.action in ['list', 'retrieve']:
-            return []
-        return super().get_authenticators()
+    authentication_classes = [LenientJWTAuthentication]
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
