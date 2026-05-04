@@ -83,6 +83,20 @@ class BookingViewSet(viewsets.ModelViewSet):
         booking.save()
         return Response({'status': 'booking completed'})
 
+    @action(detail=True, methods=['post'])
+    def cancel_booking(self, request, pk=None):
+        booking = self.get_object()
+        # Only the customer who made the booking can cancel it
+        if booking.user != request.user:
+            raise exceptions.PermissionDenied("You do not have permission to cancel this booking.")
+        
+        if booking.status != 'pending':
+            raise exceptions.ValidationError("Only pending bookings can be cancelled.")
+            
+        booking.status = 'cancelled'
+        booking.save()
+        return Response({'status': 'booking cancelled'})
+
 class JobViewSet(viewsets.ModelViewSet):
     queryset = Job.objects.select_related('customer').all()
     serializer_class = JobSerializer
