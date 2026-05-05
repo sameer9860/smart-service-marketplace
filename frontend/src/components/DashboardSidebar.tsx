@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import api from '@/lib/api';
 
 interface SidebarItemProps {
   icon: React.ReactNode;
@@ -40,6 +41,9 @@ export default function DashboardSidebar() {
 
   useEffect(() => {
     const fetchUnreadCount = async () => {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        
         try {
             const response = await api.get('/marketplace/notifications/');
             const unread = response.data.results?.filter((n: any) => !n.is_read).length || 0;
@@ -55,7 +59,6 @@ export default function DashboardSidebar() {
   }, []);
 
   useEffect(() => {
-    // Determine role from URL or localStorage
     if (pathname.includes('/provider')) setRole('provider');
     else if (pathname.includes('/customer')) setRole('customer');
     else {
