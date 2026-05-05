@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { 
   LayoutDashboard, ShoppingBag, 
   Calendar, Settings, LogOut,
-  PlusCircle, User, Package
+  PlusCircle, User, Package, Bell
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -36,6 +36,23 @@ export default function DashboardSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [role, setRole] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+        try {
+            const response = await api.get('/marketplace/notifications/');
+            const unread = response.data.results?.filter((n: any) => !n.is_read).length || 0;
+            setUnreadCount(unread);
+        } catch (err) {
+            console.error("Failed to fetch unread count", err);
+        }
+    };
+
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000); // Poll every 30s
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     // Determine role from URL or localStorage
@@ -115,6 +132,27 @@ export default function DashboardSidebar() {
             />
           </>
         )}
+
+        <div className="pt-4 mt-4 border-t border-white/5">
+            <Link 
+                href="/dashboard/notifications"
+                className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 group ${
+                    pathname === '/dashboard/notifications'
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' 
+                        : 'text-neutral-400 hover:bg-white/5 hover:text-white'
+                }`}
+            >
+                <div className="flex items-center gap-3">
+                    <Bell className={`w-5 h-5 ${pathname === '/dashboard/notifications' ? 'text-white' : 'text-neutral-500 group-hover:text-blue-400'}`} />
+                    <span className="font-bold text-sm tracking-tight">Notifications</span>
+                </div>
+                {unreadCount > 0 && (
+                    <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                        {unreadCount}
+                    </span>
+                )}
+            </Link>
+        </div>
       </div>
 
       <div className="space-y-2 pt-8 border-t border-white/5">
