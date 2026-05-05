@@ -7,6 +7,7 @@ import {
   Clock, ArrowRight, BellOff,
   Inbox, Filter
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 
 interface Notification {
@@ -17,10 +18,17 @@ interface Notification {
 }
 
 export default function NotificationsPage() {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchNotifications = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        router.push('/login');
+        return;
+    }
+    
     try {
       const response = await api.get('/marketplace/notifications/');
       setNotifications(response.data.results || response.data);
