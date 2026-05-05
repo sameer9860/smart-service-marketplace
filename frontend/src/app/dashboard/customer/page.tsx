@@ -8,6 +8,7 @@ import {
   MessageSquare, ShieldCheck, MapPin
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import ReviewModal from '@/components/ReviewModal';
 
@@ -17,16 +18,24 @@ interface Booking {
   provider_email: string;
   status: string;
   created_at: string;
-  price?: string; // We might need to add this to serializer
+  price?: string;
+  service?: number;
 }
 
 export default function CustomerDashboard() {
+  const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
 
   const fetchBookings = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        router.push('/login');
+        return;
+    }
+    
     try {
       const response = await api.get('/marketplace/bookings/');
       setBookings(response.data.results || response.data);
@@ -55,7 +64,7 @@ export default function CustomerDashboard() {
   const handleOpenReview = (booking: Booking) => {
     setSelectedBooking({
         id: booking.id,
-        service_id: (booking as any).service, // Need to ensure service ID is in booking object
+        service_id: booking.service,
         service_title: booking.service_title
     });
     setIsReviewModalOpen(true);
@@ -163,7 +172,6 @@ export default function CustomerDashboard() {
                   </div>
                 </div>
 
-                {/* Progress bar for non-cancelled orders */}
                 {booking.status !== 'cancelled' && (
                   <div className="mt-8 pt-8 border-t border-white/5">
                     <div className="relative h-2 bg-white/5 rounded-full overflow-hidden">
