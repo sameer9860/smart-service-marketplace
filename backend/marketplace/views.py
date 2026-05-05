@@ -60,6 +60,12 @@ class BookingViewSet(viewsets.ModelViewSet):
         booking = serializer.save()
         # Trigger Notification for Provider
         if booking.service:
+            # In-app notification
+            Notification.objects.create(
+                user=booking.service.provider,
+                message=f"New booking received for {booking.service.title} from {booking.user.email}."
+            )
+            # Background task (Email/Push)
             send_notification_task.delay(
                 booking.service.provider.id,
                 f"New booking received for {booking.service.title} from {booking.user.email}."
@@ -72,6 +78,12 @@ class BookingViewSet(viewsets.ModelViewSet):
             raise exceptions.PermissionDenied("You are not the provider of this service.")
         booking.status = 'confirmed'
         booking.save()
+        
+        # Notify Customer
+        Notification.objects.create(
+            user=booking.user,
+            message=f"Your booking for '{booking.service.title}' has been confirmed by the provider."
+        )
         return Response({'status': 'booking confirmed'})
 
     @action(detail=True, methods=['post'])
@@ -81,6 +93,12 @@ class BookingViewSet(viewsets.ModelViewSet):
             raise exceptions.PermissionDenied("You are not the provider of this service.")
         booking.status = 'completed'
         booking.save()
+
+        # Notify Customer
+        Notification.objects.create(
+            user=booking.user,
+            message=f"Service '{booking.service.title}' has been marked as completed. Please leave a review!"
+        )
         return Response({'status': 'booking completed'})
 
     @action(detail=True, methods=['post'])
@@ -95,6 +113,13 @@ class BookingViewSet(viewsets.ModelViewSet):
             
         booking.status = 'cancelled'
         booking.save()
+
+        # Notify Provider
+        if booking.service:
+            Notification.objects.create(
+                user=booking.service.provider,
+                message=f"The booking for '{booking.service.title}' has been cancelled by the customer."
+            )
         return Response({'status': 'booking cancelled'})
 
 class JobViewSet(viewsets.ModelViewSet):
