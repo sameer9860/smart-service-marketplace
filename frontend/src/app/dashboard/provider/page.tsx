@@ -8,6 +8,7 @@ import {
   MoreVertical, CheckCircle2, XCircle
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 
 interface Stats {
@@ -26,6 +27,7 @@ interface RecentBooking {
 }
 
 export default function ProviderDashboard() {
+  const router = useRouter();
   const [stats, setStats] = useState<Stats>({
     total_earnings: 0,
     active_services: 0,
@@ -37,6 +39,12 @@ export default function ProviderDashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+          router.push('/login');
+          return;
+      }
+      
       try {
         // In a real app, these would be dedicated dashboard endpoints
         const [servicesRes, bookingsRes] = await [
