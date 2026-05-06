@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import ServiceCard from '@/components/ServiceCard';
+import Navbar from '@/components/Navbar';
 import { Search, Filter, Loader2, Sparkles, SlidersHorizontal } from 'lucide-react';
 
 interface Service {
@@ -70,6 +71,7 @@ export default function MarketplacePage() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white">
+      <Navbar />
       {/* Hero Section */}
       <div className="relative pt-24 pb-16 px-4 overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-full">
