@@ -2,10 +2,14 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { LogIn, Mail, Lock, Loader2 } from 'lucide-react';
+import { LogIn, Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import api from '@/lib/api';
 
 export default function LoginPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -14,8 +18,27 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // Logic will be added in Day 16 integration
-    setTimeout(() => setLoading(false), 2000);
+    setError(null);
+    
+    try {
+      const response = await api.post('/accounts/login/', formData);
+      const { access, role } = response.data;
+      
+      localStorage.setItem('token', access);
+      localStorage.setItem('user_role', role);
+      
+      // Redirect based on role
+      if (role === 'provider') {
+        router.push('/dashboard/provider');
+      } else {
+        router.push('/dashboard/customer');
+      }
+    } catch (err: any) {
+      console.error("Login failed", err);
+      setError(err.response?.data?.detail || "Invalid email or password. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -34,6 +57,13 @@ export default function LoginPage() {
             <h1 className="text-3xl font-bold text-white mb-2">Welcome Back</h1>
             <p className="text-neutral-400 text-sm">Sign in to your account to continue</p>
           </div>
+
+          {error && (
+            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-500 text-sm animate-in shake-1">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              {error}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
