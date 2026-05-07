@@ -33,6 +33,8 @@ class Service(models.Model):
         indexes = [
             models.Index(fields=['category']),
             models.Index(fields=['price']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['provider']),
         ]
 
     def __str__(self):
@@ -67,6 +69,11 @@ class Booking(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user']),
+            models.Index(fields=['status']),
+            models.Index(fields=['created_at']),
+        ]
 
     def __str__(self):
         return f"{self.user.email} - {self.service.title if self.service else 'Job-based'} ({self.status})"
@@ -91,6 +98,11 @@ class Job(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['budget']),
+            models.Index(fields=['created_at']),
+        ]
 
     def __str__(self):
         return self.title
