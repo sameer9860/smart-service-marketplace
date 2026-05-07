@@ -6,8 +6,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Category, Service, Booking, Job, Bid, Review, Notification
 from .serializers import (
-    CategorySerializer, ServiceSerializer, BookingSerializer, 
-    JobSerializer, BidSerializer, ReviewSerializer, NotificationSerializer
+    CategorySerializer, ServiceSerializer, ServiceListSerializer, BookingSerializer, 
+    JobSerializer, JobListSerializer, BidSerializer, ReviewSerializer, NotificationSerializer
 )
 from .tasks import send_notification_task
 
@@ -29,8 +29,10 @@ class ServiceViewSet(viewsets.ModelViewSet):
         avg_rating=Avg('reviews__rating')
     ).all()
     serializer_class = ServiceSerializer
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['title', 'description']
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['title', 'description', 'provider__email', 'category__name']
+    ordering_fields = ['price', 'created_at', 'avg_rating']
+    ordering = ['-created_at']
     authentication_classes = [LenientJWTAuthentication]
 
     def get_permissions(self):
@@ -38,11 +40,31 @@ class ServiceViewSet(viewsets.ModelViewSet):
             return [permissions.AllowAny()]
         return [permissions.IsAuthenticated()]
 
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return ServiceListSerializer
+        return ServiceSerializer
+
     def get_queryset(self):
         queryset = super().get_queryset()
+        # Optimization: only fetch fields needed for list/detail
+        if self.action == 'list':
+            queryset = queryset.only(
+                'id', 'provider__email', 'category__name', 
+                'title', 'price', 'created_at'
+            )
+            
         category = self.request.query_params.get('category')
+        min_price = self.request.query_params.get('min_price')
+        max_price = self.request.query_params.get('max_price')
+
         if category:
             queryset = queryset.filter(category=category)
+        if min_price:
+            queryset = queryset.filter(price__gte=min_price)
+        if max_price:
+            queryset = queryset.filter(price__lte=max_price)
+            
         return queryset
 
 class BookingViewSet(viewsets.ModelViewSet):
@@ -125,7 +147,38 @@ class BookingViewSet(viewsets.ModelViewSet):
 class JobViewSet(viewsets.ModelViewSet):
     queryset = Job.objects.select_related('customer').all()
     serializer_class = JobSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['title', 'description', 'customer__email']
+    ordering_fields = ['budget', 'created_at']
+    ordering = ['-created_at']
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return JobListSerializer
+        return JobSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.action == 'list':
+            queryset = queryset.prefetch_related('bids').only(
+                'id', 'customer__email', 'title', 'budget', 'status', 'created_at'
+            )
+        else:
+            queryset = queryset.prefetch_related('bids')
+            
+        min_budget = self.request.query_params.get('min_budget')
+        max_budget = self.request.query_params.get('max_budget')
+        category = self.request.query_params.get('category')
+
+        if min_budget:
+            queryset = queryset.filter(budget__gte=min_budget)
+        if max_budget:
+            queryset = queryset.filter(budget__lte=max_budget)
+        if category:
+            queryset = queryset.filter(category=category)
+            
+        return queryset
 
     def perform_create(self, serializer):
         if self.request.user.role != 'customer':
