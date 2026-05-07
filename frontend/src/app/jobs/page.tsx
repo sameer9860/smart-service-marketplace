@@ -2,11 +2,12 @@
 
 import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
+import FilterSidebar from '@/components/FilterSidebar';
 import { 
-  Briefcase, Search, Filter, 
+  Briefcase, Search, Filter as FilterIcon, 
   MapPin, Clock, DollarSign,
   ChevronRight, ArrowRight, Loader2,
-  PlusCircle, Sparkles, User
+  PlusCircle, Sparkles, User, X
 } from 'lucide-react';
 import Link from 'next/link';
 import api from '@/lib/api';
@@ -27,10 +28,26 @@ export default function JobMarketplacePage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  
+  // Filter States
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    minPrice: '', // Will map to min_budget
+    maxPrice: '', // Will map to max_budget
+    sortBy: '-created_at'
+  });
 
-  const fetchJobs = async () => {
+  const fetchJobs = async (query?: string, currentFilters?: any) => {
+    setLoading(true);
+    const activeFilters = currentFilters || filters;
     try {
-      const response = await api.get('/marketplace/jobs/');
+      const params = new URLSearchParams();
+      if (query || search) params.append('search', query || search);
+      if (activeFilters.minPrice) params.append('min_budget', activeFilters.minPrice);
+      if (activeFilters.maxPrice) params.append('max_budget', activeFilters.maxPrice);
+      if (activeFilters.sortBy) params.append('ordering', activeFilters.sortBy);
+      
+      const response = await api.get(`/marketplace/jobs/?${params.toString()}`);
       setJobs(response.data.results || response.data);
     } catch (err) {
       console.error("Failed to fetch jobs", err);
@@ -42,6 +59,18 @@ export default function JobMarketplacePage() {
   useEffect(() => {
     fetchJobs();
   }, []);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    fetchJobs(search);
+  };
+
+  const clearFilters = () => {
+    const defaultFilters = { minPrice: '', maxPrice: '', sortBy: '-created_at' };
+    setFilters(defaultFilters);
+    setSearch('');
+    fetchJobs('', defaultFilters);
+  };
 
   return (
     <div className="min-h-screen bg-black text-white selection:bg-blue-500/30">
@@ -56,7 +85,7 @@ export default function JobMarketplacePage() {
 
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
-            <div className="max-w-2xl">
+            <div className="max-w-2xl text-left">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-black uppercase tracking-widest mb-6">
                 <Sparkles className="w-3 h-3" />
                 Community Requests
@@ -78,82 +107,122 @@ export default function JobMarketplacePage() {
             </Link>
           </div>
 
-          <div className="relative group">
+          <form onSubmit={handleSearch} className="relative group max-w-4xl">
             <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-neutral-500 group-focus-within:text-blue-500 transition-colors" />
             <input 
               type="text" 
               placeholder="Search by job title or keyword..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-neutral-900/40 backdrop-blur-xl border border-white/5 rounded-[2rem] py-6 pl-14 pr-8 text-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-neutral-700 shadow-2xl"
+              className="w-full bg-neutral-900/40 backdrop-blur-xl border border-white/5 rounded-2xl py-6 pl-14 pr-32 text-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-neutral-700 shadow-2xl"
             />
-          </div>
+            <button 
+                type="submit"
+                className="absolute right-3 top-1/2 -translate-y-1/2 px-8 py-3.5 bg-blue-600 hover:bg-blue-500 rounded-xl font-black text-sm uppercase tracking-tighter transition-all active:scale-95 shadow-xl shadow-blue-600/20"
+            >
+                Search
+            </button>
+          </form>
         </div>
       </section>
 
-      {/* Main Grid */}
+      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 pb-32">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4">
-            <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
-            <p className="text-neutral-500 font-bold tracking-widest uppercase text-xs">Fetching Opportunities...</p>
-          </div>
-        ) : jobs.length === 0 ? (
-          <div className="text-center py-32 bg-neutral-900/20 border border-dashed border-white/10 rounded-[3rem]">
-             <Briefcase className="w-16 h-16 text-neutral-800 mx-auto mb-6" />
-             <h2 className="text-2xl font-black mb-2">No Open Jobs Found</h2>
-             <p className="text-neutral-500">Be the first to post a custom request or check back later.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {jobs.map((job) => (
-              <Link 
-                key={job.id} 
-                href={`/jobs/${job.id}`}
-                className="group bg-neutral-900/40 backdrop-blur-md border border-white/5 p-8 rounded-[2.5rem] hover:border-blue-500/30 transition-all duration-500 flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-6">
-                    <span className="px-3 py-1 bg-blue-600/10 text-blue-500 text-[10px] font-black rounded-full border border-blue-500/20 uppercase tracking-widest">
-                      {job.category_name || "General"}
-                    </span>
-                    <div className="flex items-center gap-1.5 text-emerald-500 bg-emerald-500/5 px-3 py-1 rounded-full border border-emerald-500/20">
-                      <DollarSign className="w-3.5 h-3.5" />
-                      <span className="text-xs font-black uppercase tracking-tighter">Budget ${job.budget}</span>
-                    </div>
-                  </div>
-                  
-                  <h3 className="text-2xl font-black mb-4 group-hover:text-blue-400 transition-colors tracking-tight">
-                    {job.title}
-                  </h3>
-                  
-                  <p className="text-neutral-500 line-clamp-2 mb-8 font-medium leading-relaxed">
-                    {job.description}
-                  </p>
-                </div>
+        <div className="flex flex-col lg:flex-row gap-12">
+           {/* Sidebar */}
+           <FilterSidebar 
+              isOpen={isFilterOpen}
+              onClose={() => setIsFilterOpen(false)}
+              filters={filters}
+              setFilters={setFilters}
+              onApply={() => fetchJobs()}
+           />
 
-                <div className="pt-8 border-t border-white/5 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="flex -space-x-2">
-                       {[1, 2, 3].map((i) => (
-                         <div key={i} className="w-8 h-8 rounded-full bg-neutral-800 border-2 border-black flex items-center justify-center text-[10px] font-bold">
-                           <User className="w-4 h-4 text-neutral-500" />
-                         </div>
-                       ))}
-                    </div>
-                    <span className="text-xs font-bold text-neutral-400 uppercase tracking-widest">
-                      {job.bids_count || 0} Bids Received
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-blue-500 font-black text-sm uppercase tracking-tighter group-hover:gap-4 transition-all">
-                    View Details
-                    <ChevronRight className="w-5 h-5" />
-                  </div>
+           <div className="flex-grow space-y-8">
+              {/* Controls */}
+              <div className="flex items-center justify-between">
+                 <button 
+                   onClick={() => setIsFilterOpen(true)}
+                   className="lg:hidden flex items-center gap-2 px-5 py-2.5 bg-neutral-900 border border-white/10 rounded-xl text-white font-bold transition-all"
+                 >
+                   <FilterIcon className="w-4 h-4" />
+                   Filters
+                 </button>
+                 
+                 {(search || filters.minPrice || filters.maxPrice) && (
+                   <div className="flex items-center gap-3">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Filtered View</span>
+                      <button 
+                        onClick={clearFilters}
+                        className="flex items-center gap-1 text-red-500 text-xs font-bold hover:bg-red-500/10 px-3 py-1 rounded-full transition-all"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        Reset
+                      </button>
+                   </div>
+                 )}
+              </div>
+
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-4">
+                  <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
+                  <p className="text-neutral-500 font-bold tracking-widest uppercase text-xs">Matching Opportunities...</p>
                 </div>
-              </Link>
-            ))}
-          </div>
-        )}
+              ) : jobs.length === 0 ? (
+                <div className="text-center py-32 bg-neutral-900/20 border border-dashed border-white/10 rounded-[3rem]">
+                   <Briefcase className="w-16 h-16 text-neutral-800 mx-auto mb-6" />
+                   <h2 className="text-2xl font-black mb-2">No Jobs Found</h2>
+                   <p className="text-neutral-500">Try adjusting your filters or search keywords.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-6">
+                  {jobs.map((job) => (
+                    <Link 
+                      key={job.id} 
+                      href={`/jobs/${job.id}`}
+                      className="group bg-neutral-900/40 backdrop-blur-md border border-white/5 p-8 rounded-[2.5rem] hover:border-blue-500/30 transition-all duration-500 flex flex-col md:flex-row justify-between gap-8"
+                    >
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                          <span className="px-3 py-1 bg-blue-600/10 text-blue-500 text-[10px] font-black rounded-full border border-blue-500/20 uppercase tracking-widest">
+                            {job.category_name || "General"}
+                          </span>
+                          <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">
+                            {new Date(job.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                        
+                        <h3 className="text-2xl font-black group-hover:text-blue-400 transition-colors tracking-tight">
+                          {job.title}
+                        </h3>
+                        
+                        <p className="text-neutral-500 line-clamp-2 font-medium leading-relaxed max-w-2xl">
+                          {job.description}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col items-end justify-between min-w-[200px]">
+                        <div className="flex items-center gap-1.5 text-emerald-500 bg-emerald-500/5 px-4 py-2 rounded-2xl border border-emerald-500/20">
+                          <DollarSign className="w-4 h-4" />
+                          <span className="text-xl font-black tracking-tighter">${job.budget}</span>
+                        </div>
+                        
+                        <div className="flex items-center gap-4 pt-4">
+                          <div className="flex items-center gap-2 text-neutral-400 text-xs font-bold uppercase tracking-widest">
+                            <User className="w-4 h-4" />
+                            {job.bids_count || 0} Bids
+                          </div>
+                          <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all">
+                             <ChevronRight className="w-5 h-5" />
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+           </div>
+        </div>
       </main>
     </div>
   );
