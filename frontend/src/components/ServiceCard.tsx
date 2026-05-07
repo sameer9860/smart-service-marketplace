@@ -16,7 +16,7 @@ interface ServiceCardProps {
   };
 }
 
-export default function ServiceCard({ service }: ServiceCardProps) {
+const ServiceCard = React.memo(({ service }: ServiceCardProps) => {
   return (
     <div className="group bg-neutral-900/40 backdrop-blur-md border border-white/5 rounded-2xl overflow-hidden hover:border-blue-500/30 transition-all duration-300 hover:shadow-2xl hover:shadow-blue-500/10 flex flex-col h-full">
       <div className="p-6 flex-grow">
@@ -67,4 +67,6 @@ export default function ServiceCard({ service }: ServiceCardProps) {
       </div>
     </div>
   );
-}
+});
+
+export default ServiceCard;
