@@ -4,7 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { 
   LayoutDashboard, ShoppingBag, 
   Calendar, Settings, LogOut,
-  PlusCircle, User, Package, Bell
+  PlusCircle, User, Package, Bell,
+  Briefcase, MessageSquare
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -113,6 +114,18 @@ export default function DashboardSidebar() {
               href="/dashboard/provider/bookings" 
               active={pathname === '/dashboard/provider/bookings'}
             />
+            <SidebarItem 
+              icon={<Briefcase className="w-5 h-5" />} 
+              label="Marketplace Jobs" 
+              href="/jobs" 
+              active={pathname === '/jobs'}
+            />
+            <SidebarItem 
+              icon={<MessageSquare className="w-5 h-5" />} 
+              label="My Active Bids" 
+              href="/dashboard/provider/bids" 
+              active={pathname === '/dashboard/provider/bids'}
+            />
           </>
         ) : (
           <>
@@ -127,6 +140,18 @@ export default function DashboardSidebar() {
               label="My Bookings" 
               href="/dashboard/customer/bookings" 
               active={pathname.includes('/bookings')}
+            />
+            <SidebarItem 
+              icon={<PlusCircle className="w-5 h-5" />} 
+              label="Post a Job" 
+              href="/jobs/new" 
+              active={pathname === '/jobs/new'}
+            />
+            <SidebarItem 
+              icon={<Briefcase className="w-5 h-5" />} 
+              label="My Job Posts" 
+              href="/dashboard/customer/jobs" 
+              active={pathname === '/dashboard/customer/jobs'}
             />
              <SidebarItem 
               icon={<ShoppingBag className="w-5 h-5" />} 
