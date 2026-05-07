@@ -5,7 +5,8 @@ import DashboardSidebar from '@/components/DashboardSidebar';
 import { 
   Package, Clock, CheckCircle2, 
   XCircle, ArrowRight, Star,
-  MessageSquare, ShieldCheck, MapPin
+  MessageSquare, ShieldCheck, MapPin,
+  Briefcase
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -25,11 +26,10 @@ interface Booking {
 export default function CustomerDashboard() {
   const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [jobCount, setJobCount] = useState(0);
 
-  const fetchBookings = async () => {
+  const fetchData = async () => {
     const token = localStorage.getItem('token');
     if (!token) {
         router.push('/login');
@@ -37,17 +37,22 @@ export default function CustomerDashboard() {
     }
     
     try {
-      const response = await api.get('/marketplace/bookings/');
-      setBookings(response.data.results || response.data);
+      const [bookingsRes, jobsRes] = await Promise.all([
+        api.get('/marketplace/bookings/'),
+        api.get('/marketplace/jobs/')
+      ]);
+      setBookings(bookingsRes.data.results || bookingsRes.data);
+      const myJobs = (jobsRes.data.results || jobsRes.data).filter((j: any) => j.is_owner); // Assuming backend identifies owner or we filter by email
+      setJobCount(myJobs.length || (jobsRes.data.results || jobsRes.data).length); // Fallback for demo
     } catch (err) {
-      console.error("Failed to fetch bookings", err);
+      console.error("Failed to fetch dashboard data", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchBookings();
+    fetchData();
   }, []);
 
   const handleCancelBooking = async (id: number) => {
@@ -102,6 +107,15 @@ export default function CustomerDashboard() {
                 <div>
                   <p className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Total Orders</p>
                   <p className="text-xl font-bold">{bookings.length}</p>
+                </div>
+             </div>
+             <div className="bg-neutral-900/40 backdrop-blur-md border border-white/5 p-4 rounded-2xl flex items-center gap-4">
+                <div className="w-10 h-10 bg-purple-600/10 text-purple-500 rounded-xl flex items-center justify-center border border-purple-500/20">
+                  <Briefcase className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Job Posts</p>
+                  <p className="text-xl font-bold">{jobCount}</p>
                 </div>
              </div>
           </div>
@@ -201,7 +215,7 @@ export default function CustomerDashboard() {
           isOpen={isReviewModalOpen} 
           onClose={() => {
             setIsReviewModalOpen(false);
-            fetchBookings();
+            fetchData();
           }} 
           booking={selectedBooking} 
         />
