@@ -18,6 +18,18 @@ class ServiceSerializer(serializers.ModelSerializer):
             'title', 'description', 'price', 'created_at', 'avg_rating'
         ]
         read_only_fields = ['provider', 'created_at', 'avg_rating']
+        
+class ServiceListSerializer(serializers.ModelSerializer):
+    category_name = serializers.ReadOnlyField(source='category.name')
+    provider_email = serializers.ReadOnlyField(source='provider.email')
+    avg_rating = serializers.FloatField(read_only=True)
+
+    class Meta:
+        model = Service
+        fields = [
+            'id', 'provider_email', 'category_name', 
+            'title', 'price', 'created_at', 'avg_rating'
+        ]
 
     def create(self, validated_data):
         # Automatically set provider to current user
@@ -45,6 +57,14 @@ class JobSerializer(serializers.ModelSerializer):
         model = Job
         fields = ['id', 'customer', 'customer_email', 'title', 'description', 'budget', 'status', 'created_at']
         read_only_fields = ['customer', 'status', 'created_at']
+
+class JobListSerializer(serializers.ModelSerializer):
+    customer_email = serializers.ReadOnlyField(source='customer.email')
+    bids_count = serializers.IntegerField(source='bids.count', read_only=True)
+
+    class Meta:
+        model = Job
+        fields = ['id', 'customer_email', 'title', 'budget', 'status', 'created_at', 'bids_count']
 
     def create(self, validated_data):
         validated_data['customer'] = self.context['request'].user
