@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import DashboardSidebar from '@/components/DashboardSidebar';
+import ImageUpload from '@/components/ImageUpload';
 import { 
   User, Mail, Shield, 
   Calendar, Edit3, Check,
@@ -14,6 +15,7 @@ interface UserProfile {
   email: string;
   role: string;
   full_name: string;
+  avatar: string | null;
   date_joined: string;
 }
 
@@ -23,6 +25,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [newName, setNewName] = useState('');
+  const [newAvatar, setNewAvatar] = useState<File | null>(null);
   const [saveLoading, setSaveLoading] = useState(false);
 
   const fetchProfile = async () => {
@@ -44,10 +47,23 @@ export default function ProfilePage() {
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaveLoading(true);
+    
     try {
-      const response = await api.put('/accounts/profile/', { full_name: newName });
+      const formData = new FormData();
+      formData.append('full_name', newName);
+      if (newAvatar) {
+        formData.append('avatar', newAvatar);
+      }
+
+      const response = await api.put('/accounts/profile/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
       setProfile(response.data);
       setIsEditing(false);
+      setNewAvatar(null);
     } catch (err) {
       console.error("Failed to update profile", err);
       alert("Failed to update profile. Please try again.");
@@ -81,10 +97,23 @@ export default function ProfilePage() {
             
             <div className="flex flex-col md:flex-row items-center gap-10 relative z-10">
               <div className="relative group/avatar">
-                <div className="w-32 h-32 bg-blue-600 rounded-[2.5rem] flex items-center justify-center text-4xl font-black text-white shadow-2xl shadow-blue-600/20 border-4 border-white/10 group-hover:scale-105 transition-transform duration-500">
-                  {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : 'U'}
-                </div>
-                <button className="absolute -bottom-2 -right-2 p-3 bg-white text-black rounded-2xl shadow-xl opacity-0 group-hover/avatar:opacity-100 transition-all hover:scale-110">
+                {profile?.avatar ? (
+                  <div className="w-32 h-32 rounded-[2.5rem] overflow-hidden border-4 border-white/10 shadow-2xl shadow-blue-600/20">
+                    <img 
+                      src={profile.avatar} 
+                      alt={profile.full_name} 
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                    />
+                  </div>
+                ) : (
+                  <div className="w-32 h-32 bg-blue-600 rounded-[2.5rem] flex items-center justify-center text-4xl font-black text-white shadow-2xl shadow-blue-600/20 border-4 border-white/10 group-hover:scale-105 transition-transform duration-500">
+                    {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                )}
+                <button 
+                  onClick={() => setIsEditing(true)}
+                  className="absolute -bottom-2 -right-2 p-3 bg-white text-black rounded-2xl shadow-xl opacity-0 group-hover/avatar:opacity-100 transition-all hover:scale-110"
+                >
                   <Camera className="w-5 h-5" />
                 </button>
               </div>
@@ -109,10 +138,12 @@ export default function ProfilePage() {
               <div className="flex flex-col gap-3 shrink-0">
                 <button 
                   onClick={() => setIsEditing(!isEditing)}
-                  className="px-6 py-3 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl transition-all border border-white/5 flex items-center gap-2"
+                  className={`px-6 py-3 font-bold rounded-xl transition-all border flex items-center gap-2 ${
+                    isEditing ? 'bg-blue-600 border-blue-500 text-white' : 'bg-white/5 hover:bg-white/10 text-white border-white/5'
+                  }`}
                 >
                   <Edit3 className="w-4 h-4" />
-                  Edit Profile
+                  {isEditing ? 'Discard Changes' : 'Edit Profile'}
                 </button>
                 <button 
                   onClick={logout}
@@ -134,6 +165,14 @@ export default function ProfilePage() {
               </h3>
               
               <form onSubmit={handleUpdateProfile} className="space-y-6">
+                {isEditing && (
+                  <ImageUpload 
+                    initialImage={profile?.avatar || undefined}
+                    onImageChange={(file) => setNewAvatar(file)}
+                    label="Profile Avatar"
+                  />
+                )}
+                
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-neutral-500 uppercase tracking-widest ml-1">Full Name</label>
                   <input 
