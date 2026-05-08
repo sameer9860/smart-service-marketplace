@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import DashboardSidebar from '@/components/DashboardSidebar';
+import ImageUpload from '@/components/ImageUpload';
 import { 
   ArrowLeft, Save, Plus, 
   DollarSign, Tag, FileText, 
-  Sparkles, CheckCircle2, AlertCircle
+  Sparkles, CheckCircle2, AlertCircle,
+  ImageIcon
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
@@ -28,6 +30,7 @@ export default function NewServicePage() {
     price: '',
     category: ''
   });
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -47,7 +50,21 @@ export default function NewServicePage() {
     setError(null);
 
     try {
-      await api.post('/marketplace/services/', formData);
+      const data = new FormData();
+      data.append('title', formData.title);
+      data.append('description', formData.description);
+      data.append('price', formData.price);
+      data.append('category', formData.category);
+      if (imageFile) {
+        data.append('image', imageFile);
+      }
+
+      await api.post('/marketplace/services/', data, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
       setSuccess(true);
       setTimeout(() => router.push('/dashboard/provider'), 2000);
     } catch (err: any) {
@@ -88,6 +105,12 @@ export default function NewServicePage() {
           <div className="lg:col-span-2">
             <form onSubmit={handleSubmit} className="space-y-8">
               <div className="bg-neutral-900/40 backdrop-blur-md border border-white/5 p-10 rounded-[2.5rem] space-y-8">
+                <ImageUpload 
+                  label="Service Showcase Image"
+                  aspectRatio="video"
+                  onImageChange={(file) => setImageFile(file)}
+                />
+
                 <div className="space-y-4">
                   <label className="flex items-center gap-2 text-sm font-bold text-neutral-400 uppercase tracking-widest">
                     <Sparkles className="w-4 h-4 text-blue-500" />
@@ -204,8 +227,19 @@ export default function NewServicePage() {
                 Live Preview
               </h3>
               <div className="bg-black/40 border border-white/5 rounded-3xl overflow-hidden group">
-                <div className="h-40 bg-neutral-800 flex items-center justify-center text-neutral-600">
-                   Image Preview Placeholder
+                <div className="aspect-video bg-neutral-800 flex items-center justify-center text-neutral-600 overflow-hidden">
+                   {imageFile ? (
+                     <img 
+                       src={URL.createObjectURL(imageFile)} 
+                       alt="Preview" 
+                       className="w-full h-full object-cover" 
+                     />
+                   ) : (
+                     <div className="flex flex-col items-center gap-2">
+                        <ImageIcon className="w-8 h-8 opacity-20" />
+                        <span className="text-[10px] uppercase font-black tracking-widest opacity-20">No Image Selected</span>
+                     </div>
+                   )}
                 </div>
                 <div className="p-6">
                   <div className="flex justify-between items-start mb-4">
