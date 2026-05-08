@@ -15,7 +15,7 @@ class ServiceSerializer(serializers.ModelSerializer):
         model = Service
         fields = [
             'id', 'provider', 'provider_email', 'category', 'category_name', 
-            'title', 'description', 'price', 'created_at', 'avg_rating'
+            'title', 'description', 'price', 'image', 'created_at', 'avg_rating'
         ]
         read_only_fields = ['provider', 'created_at', 'avg_rating']
         
@@ -28,7 +28,7 @@ class ServiceListSerializer(serializers.ModelSerializer):
         model = Service
         fields = [
             'id', 'provider_email', 'category_name', 
-            'title', 'price', 'created_at', 'avg_rating'
+            'title', 'price', 'image', 'created_at', 'avg_rating'
         ]
 
     def create(self, validated_data):
