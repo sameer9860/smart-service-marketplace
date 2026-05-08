@@ -47,25 +47,20 @@ class LoginView(APIView):
             })
         return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
+from .serializers import UserSerializer
+
 class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
-        return Response({
-            'email': user.email,
-            'role': user.role,
-            'full_name': user.full_name,
-            'date_joined': user.date_joined
-        })
+        serializer = UserSerializer(user)
+        return Response(serializer.data)
 
     def put(self, request):
         user = request.user
-        user.full_name = request.data.get('full_name', user.full_name)
-        user.save()
-        return Response({
-            'email': user.email,
-            'role': user.role,
-            'full_name': user.full_name,
-            'date_joined': user.date_joined
-        })
+        serializer = UserSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
