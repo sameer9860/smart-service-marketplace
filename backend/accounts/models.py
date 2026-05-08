@@ -47,6 +47,7 @@ class User(AbstractUser):
         choices=ROLE_CHOICES,
         default='customer'
     )
+    avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
 
     USERNAME_FIELD = 'email'                         # ← Login with email
     REQUIRED_FIELDS = []                             # ← No extra required fields
