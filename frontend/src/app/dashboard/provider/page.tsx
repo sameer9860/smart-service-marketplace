@@ -40,8 +40,15 @@ export default function ProviderDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       const token = localStorage.getItem('token');
+      const role = localStorage.getItem('role');
+
       if (!token) {
           router.push('/login');
+          return;
+      }
+
+      if (role !== 'provider') {
+          router.push('/dashboard/customer');
           return;
       }
       
