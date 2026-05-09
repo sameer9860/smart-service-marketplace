@@ -8,6 +8,7 @@ from .models import User
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+    throttle_scope = 'strict'
 
     def post(self, request):
         email = request.data.get('email')
@@ -31,6 +32,7 @@ class RegisterView(APIView):
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    throttle_scope = 'strict'
 
     def post(self, request):
         email = request.data.get('email')
