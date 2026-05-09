@@ -27,12 +27,20 @@ export default function CustomerDashboard() {
   const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [jobCount, setJobCount] = useState(0);
 
   const fetchData = async () => {
     const token = localStorage.getItem('token');
+    const role = localStorage.getItem('role');
+
     if (!token) {
         router.push('/login');
+        return;
+    }
+
+    if (role !== 'customer') {
+        router.push('/dashboard/provider');
         return;
     }
     
