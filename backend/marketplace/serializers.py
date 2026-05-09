@@ -18,6 +18,11 @@ class ServiceSerializer(serializers.ModelSerializer):
             'title', 'description', 'price', 'image', 'created_at', 'avg_rating'
         ]
         read_only_fields = ['provider', 'created_at', 'avg_rating']
+
+    def validate_price(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Price must be greater than zero.")
+        return value
         
 class ServiceListSerializer(serializers.ModelSerializer):
     category_name = serializers.ReadOnlyField(source='category.name')
@@ -58,6 +63,11 @@ class JobSerializer(serializers.ModelSerializer):
         fields = ['id', 'customer', 'customer_email', 'title', 'description', 'budget', 'status', 'created_at']
         read_only_fields = ['customer', 'status', 'created_at']
 
+    def validate_budget(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Budget must be greater than zero.")
+        return value
+
 class JobListSerializer(serializers.ModelSerializer):
     customer_email = serializers.ReadOnlyField(source='customer.email')
     bids_count = serializers.IntegerField(source='bids.count', read_only=True)
@@ -90,6 +100,22 @@ class ReviewSerializer(serializers.ModelSerializer):
         model = Review
         fields = ['id', 'user', 'user_email', 'service', 'rating', 'comment', 'created_at']
         read_only_fields = ['user', 'created_at']
+
+    def validate(self, data):
+        user = self.context['request'].user
+        service = data['service']
+        
+        from .models import Booking
+        has_completed_booking = Booking.objects.filter(
+            user=user,
+            service=service,
+            status='completed'
+        ).exists()
+        
+        if not has_completed_booking:
+            raise serializers.ValidationError("You can only review services you have successfully completed.")
+            
+        return data
 
     def create(self, validated_data):
         validated_data['user'] = self.context['request'].user
