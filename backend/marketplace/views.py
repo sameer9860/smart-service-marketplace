@@ -9,6 +9,7 @@ from .serializers import (
     CategorySerializer, ServiceSerializer, ServiceListSerializer, BookingSerializer, 
     JobSerializer, JobListSerializer, BidSerializer, ReviewSerializer, NotificationSerializer
 )
+from .permissions import IsOwnerOrReadOnly, IsCustomer, IsProvider
 from .tasks import send_notification_task
 
 class LenientJWTAuthentication(JWTAuthentication):
@@ -38,7 +39,9 @@ class ServiceViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
             return [permissions.AllowAny()]
-        return [permissions.IsAuthenticated()]
+        if self.action == 'create':
+            return [permissions.IsAuthenticated(), IsProvider()]
+        return [permissions.IsAuthenticated(), IsOwnerOrReadOnly()]
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -151,7 +154,13 @@ class JobViewSet(viewsets.ModelViewSet):
     search_fields = ['title', 'description', 'customer__email']
     ordering_fields = ['budget', 'created_at']
     ordering = ['-created_at']
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [permissions.AllowAny()]
+        if self.action == 'create':
+            return [permissions.IsAuthenticated(), IsCustomer()]
+        return [permissions.IsAuthenticated(), IsOwnerOrReadOnly()]
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -188,7 +197,11 @@ class JobViewSet(viewsets.ModelViewSet):
 class BidViewSet(viewsets.ModelViewSet):
     queryset = Bid.objects.select_related('job', 'provider').all()
     serializer_class = BidSerializer
-    permission_classes = [permissions.IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action == 'create':
+            return [permissions.IsAuthenticated(), IsProvider()]
+        return [permissions.IsAuthenticated(), IsOwnerOrReadOnly()]
 
     def perform_create(self, serializer):
         if self.request.user.role != 'provider':
