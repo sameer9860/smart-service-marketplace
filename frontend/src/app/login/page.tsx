@@ -25,14 +25,24 @@ export default function LoginPage() {
       const { access, role } = response.data;
       
       localStorage.setItem('token', access);
-      localStorage.setItem('user_role', role);
+      localStorage.setItem('role', role);
+      localStorage.setItem('email', formData.email);
       
-      // Redirect based on role
+      if (!access) {
+        router.push('/login');
+        return;
+      }
+
       if (role === 'provider') {
         router.push('/dashboard/provider');
-      } else {
-        router.push('/dashboard/customer');
+        return;
       }
+
+      if (role !== 'customer') {
+        router.push('/login');
+        return;
+      }
+      router.push('/dashboard/customer');
     } catch (err: any) {
       console.error("Login failed", err);
       setError(err.response?.data?.detail || "Invalid email or password. Please try again.");
