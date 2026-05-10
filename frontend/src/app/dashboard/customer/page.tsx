@@ -12,6 +12,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import ReviewModal from '@/components/ReviewModal';
+import ChatWindow from '@/components/ChatWindow';
+import { MessageSquare as ChatIcon } from 'lucide-react';
 
 interface Booking {
   id: number;
@@ -27,6 +29,7 @@ export default function CustomerDashboard() {
   const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [jobCount, setJobCount] = useState(0);
 
@@ -187,6 +190,13 @@ export default function CustomerDashboard() {
                         <Star className="w-4 h-4" />
                       </button>
                     )}
+                    <button 
+                      onClick={() => setActiveConversationId(booking.id)} // For demo, assuming conversation ID matches booking ID or we fetch it
+                      className="px-6 py-3 bg-white/5 hover:bg-blue-600/10 text-white hover:text-blue-500 text-sm font-bold rounded-xl transition-all flex items-center gap-2 border border-transparent hover:border-blue-500/20"
+                    >
+                      Message
+                      <ChatIcon className="w-4 h-4" />
+                    </button>
                     <button className="px-6 py-3 bg-white/5 hover:bg-white/10 text-white text-sm font-bold rounded-xl transition-all flex items-center gap-2">
                       Order Details
                       <ArrowRight className="w-4 h-4" />
@@ -227,6 +237,16 @@ export default function CustomerDashboard() {
           }} 
           booking={selectedBooking} 
         />
+      )}
+
+      {/* Slide-over Chat */}
+      {activeConversationId && (
+        <div className="fixed inset-y-0 right-0 w-full lg:w-[450px] z-50 shadow-2xl">
+          <ChatWindow 
+            conversationId={activeConversationId} 
+            onClose={() => setActiveConversationId(null)} 
+          />
+        </div>
       )}
     </div>
   );
