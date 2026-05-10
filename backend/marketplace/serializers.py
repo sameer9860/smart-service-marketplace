@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Category, Service, Booking, Job, Bid, Review, Notification
+from .models import Category, Service, Booking, Job, Bid, Review, Notification, Conversation, Message
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -126,3 +126,38 @@ class NotificationSerializer(serializers.ModelSerializer):
         model = Notification
         fields = ['id', 'message', 'is_read', 'created_at']
         read_only_fields = ['id', 'message', 'is_read', 'created_at']
+
+class MessageSerializer(serializers.ModelSerializer):
+    sender_email = serializers.ReadOnlyField(source='sender.email')
+
+    class Meta:
+        model = Message
+        fields = ['id', 'conversation', 'sender', 'sender_email', 'text', 'is_read', 'created_at']
+        read_only_fields = ['sender', 'created_at']
+
+class ConversationSerializer(serializers.ModelSerializer):
+    other_participant = serializers.SerializerMethodField()
+    last_message = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Conversation
+        fields = ['id', 'other_participant', 'last_message', 'created_at', 'updated_at', 'booking', 'job']
+
+    def get_other_participant(self, obj):
+        request = self.context.get('request')
+        if request and request.user:
+            other = obj.participants.exclude(id=request.user.id).first()
+            if other:
+                return {
+                    'id': other.id,
+                    'email': other.email,
+                    'full_name': getattr(other, 'full_name', ''),
+                    'avatar': request.build_absolute_uri(other.avatar.url) if other.avatar else None
+                }
+        return None
+
+    def get_last_message(self, obj):
+        last = obj.messages.last()
+        if last:
+            return MessageSerializer(last).data
+        return None
