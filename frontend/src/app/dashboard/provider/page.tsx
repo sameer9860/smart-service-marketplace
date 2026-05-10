@@ -10,6 +10,8 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
+import ChatWindow from '@/components/ChatWindow';
+import { MessageSquare as ChatIcon } from 'lucide-react';
 
 interface Stats {
   total_earnings: number;
@@ -35,6 +37,7 @@ export default function ProviderDashboard() {
     total_customers: 0
   });
   const [recentBookings, setRecentBookings] = useState<RecentBooking[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -184,9 +187,17 @@ export default function ProviderDashboard() {
                           May 2, 2026
                         </td>
                         <td className="px-8 py-6">
-                          <button className="p-2 hover:bg-white/10 rounded-lg transition-colors text-neutral-500 hover:text-white">
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
+                           <div className="flex items-center gap-2">
+                             <button 
+                               onClick={() => setActiveConversationId(i)} // For demo, assuming conv ID
+                               className="p-2 hover:bg-blue-600/10 text-neutral-500 hover:text-blue-500 rounded-lg transition-all"
+                             >
+                               <ChatIcon className="w-4 h-4" />
+                             </button>
+                             <button className="p-2 hover:bg-white/10 rounded-lg transition-colors text-neutral-500 hover:text-white">
+                               <MoreVertical className="w-4 h-4" />
+                             </button>
+                           </div>
                         </td>
                       </tr>
                     ))}
@@ -232,6 +243,16 @@ export default function ProviderDashboard() {
           </div>
         </div>
       </main>
+
+      {/* Slide-over Chat */}
+      {activeConversationId && (
+        <div className="fixed inset-y-0 right-0 w-full lg:w-[450px] z-50 shadow-2xl">
+          <ChatWindow 
+            conversationId={activeConversationId} 
+            onClose={() => setActiveConversationId(null)} 
+          />
+        </div>
+      )}
     </div>
   );
 }
