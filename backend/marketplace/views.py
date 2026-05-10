@@ -4,10 +4,11 @@ from rest_framework import viewsets, permissions, exceptions, filters
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Category, Service, Booking, Job, Bid, Review, Notification
+from .models import Category, Service, Booking, Job, Bid, Review, Notification, Conversation, Message
 from .serializers import (
     CategorySerializer, ServiceSerializer, ServiceListSerializer, BookingSerializer, 
-    JobSerializer, JobListSerializer, BidSerializer, ReviewSerializer, NotificationSerializer
+    JobSerializer, JobListSerializer, BidSerializer, ReviewSerializer, NotificationSerializer,
+    MessageSerializer, ConversationSerializer
 )
 from .permissions import IsOwnerOrReadOnly, IsCustomer, IsProvider
 from .tasks import send_notification_task
@@ -83,6 +84,10 @@ class BookingViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         booking = serializer.save()
+        # Auto-create conversation
+        conversation = Conversation.objects.create(booking=booking)
+        conversation.participants.add(self.request.user, booking.service.provider)
+        
         # Trigger Notification for Provider
         if booking.service:
             # In-app notification
@@ -296,3 +301,26 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
         notification.is_read = True
         notification.save()
         return Response({'status': 'notification marked as read'})
+
+class ConversationViewSet(viewsets.ModelViewSet):
+    serializer_class = ConversationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Conversation.objects.filter(participants=self.request.user)
+
+class MessageViewSet(viewsets.ModelViewSet):
+    serializer_class = MessageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Message.objects.filter(conversation__participants=self.request.user)
+
+    def perform_create(self, serializer):
+        conversation = serializer.validated_data['conversation']
+        if self.request.user not in conversation.participants.all():
+            raise exceptions.PermissionDenied("You are not a participant in this conversation.")
+        
+        serializer.save(sender=self.request.user)
+        # Update conversation timestamp
+        conversation.save() 
