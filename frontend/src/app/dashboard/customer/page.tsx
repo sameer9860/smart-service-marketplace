@@ -28,6 +28,7 @@ interface Booking {
 export default function CustomerDashboard() {
   const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,8 +43,13 @@ export default function CustomerDashboard() {
         return;
     }
 
-    if (role !== 'customer') {
+    if (role === 'provider') {
         router.push('/dashboard/provider');
+        return;
+    }
+
+    if (role !== 'customer') {
+        router.push('/login');
         return;
     }
     
