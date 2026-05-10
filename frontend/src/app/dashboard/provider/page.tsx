@@ -50,8 +50,13 @@ export default function ProviderDashboard() {
           return;
       }
 
-      if (role !== 'provider') {
+      if (role === 'customer') {
           router.push('/dashboard/customer');
+          return;
+      }
+
+      if (role !== 'provider') {
+          router.push('/login');
           return;
       }
       
