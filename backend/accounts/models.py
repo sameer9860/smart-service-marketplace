@@ -37,6 +37,7 @@ class UserManager(BaseUserManager):
 class User(AbstractUser):
     username = None                                  # ← Remove username field
     email = models.EmailField(unique=True)           # ← Email is now the login field
+    full_name = models.CharField(max_length=255, blank=True)
 
     ROLE_CHOICES = (
         ('customer', 'Customer'),
