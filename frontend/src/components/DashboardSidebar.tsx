@@ -63,14 +63,15 @@ export default function DashboardSidebar() {
     if (pathname.includes('/provider')) setRole('provider');
     else if (pathname.includes('/customer')) setRole('customer');
     else {
-        const storedRole = localStorage.getItem('user_role');
+        const storedRole = localStorage.getItem('role');
         setRole(storedRole);
     }
   }, [pathname]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
-    localStorage.removeItem('user_role');
+    localStorage.removeItem('role');
+    localStorage.removeItem('email');
     router.push('/login');
   };
 
