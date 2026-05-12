@@ -90,7 +90,7 @@ export default function PasswordChangeModal({ isOpen, onClose }: PasswordModalPr
                   onChange={(e) => setFormData({...formData, old_password: e.target.value})}
                 />
                 <button type="button" onClick={() => setShowOld(!showOld)} className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white">
-                  {showOld ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showOld ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </button>
               </div>
             </div>
@@ -106,7 +106,7 @@ export default function PasswordChangeModal({ isOpen, onClose }: PasswordModalPr
                   onChange={(e) => setFormData({...formData, new_password: e.target.value})}
                 />
                 <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white">
-                  {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showNew ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </button>
               </div>
             </div>
@@ -122,7 +122,7 @@ export default function PasswordChangeModal({ isOpen, onClose }: PasswordModalPr
                   onChange={(e) => setFormData({...formData, confirm_password: e.target.value})}
                 />
                 <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white">
-                  {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showConfirm ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </button>
               </div>
             </div>
