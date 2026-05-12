@@ -64,5 +64,45 @@ class ProfileView(APIView):
         serializer = UserSerializer(user, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            ActivityLog.objects.create(
+                user=user,
+                action="Updated profile information",
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT')
+            )
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+from .serializers import ChangePasswordSerializer, ActivityLogSerializer
+from .models import ActivityLog
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        serializer = ChangePasswordSerializer(data=request.data)
+        if serializer.is_valid():
+            if not user.check_password(serializer.data.get('old_password')):
+                return Response({"old_password": ["Wrong password."]}, status=status.HTTP_400_BAD_REQUEST)
+            
+            user.set_password(serializer.data.get('new_password'))
+            user.save()
+            
+            ActivityLog.objects.create(
+                user=user,
+                action="Changed password",
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT')
+            )
+            
+            return Response({"message": "Password updated successfully"}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class ActivityLogView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        logs = ActivityLog.objects.filter(user=request.user)[:20]
+        serializer = ActivityLogSerializer(logs, many=True)
+        return Response(serializer.data)
