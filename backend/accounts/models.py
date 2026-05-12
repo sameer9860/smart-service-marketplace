@@ -57,3 +57,16 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.email
+
+class ActivityLog(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='activity_logs')
+    action = models.CharField(max_length=255)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(null=True, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"{self.user.email} - {self.action} at {self.timestamp}"
