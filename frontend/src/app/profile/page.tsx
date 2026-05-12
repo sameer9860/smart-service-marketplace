@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
+import PasswordChangeModal from '@/components/PasswordChangeModal';
 
 interface UserProfile {
   email: string;
@@ -27,6 +28,7 @@ export default function ProfilePage() {
   const [newName, setNewName] = useState('');
   const [newAvatar, setNewAvatar] = useState<File | null>(null);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const fetchProfile = async () => {
     try {
@@ -212,7 +214,10 @@ export default function ProfilePage() {
                 Security & Preferences
               </h3>
               <div className="space-y-4">
-                <button className="w-full p-4 bg-white/5 hover:bg-white/10 rounded-2xl text-left font-bold transition-all flex items-center justify-between group">
+                <button 
+                  onClick={() => setShowPasswordModal(true)}
+                  className="w-full p-4 bg-white/5 hover:bg-white/10 rounded-2xl text-left font-bold transition-all flex items-center justify-between group"
+                >
                   Change Password
                   <Edit3 className="w-4 h-4 text-neutral-600 group-hover:text-white transition-colors" />
                 </button>
@@ -231,6 +236,11 @@ export default function ProfilePage() {
           </div>
         </div>
       </main>
+
+      <PasswordChangeModal 
+        isOpen={showPasswordModal} 
+        onClose={() => setShowPasswordModal(false)} 
+      />
     </div>
   );
 }
