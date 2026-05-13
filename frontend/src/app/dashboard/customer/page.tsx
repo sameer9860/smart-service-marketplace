@@ -13,7 +13,8 @@ import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import ReviewModal from '@/components/ReviewModal';
 import ChatWindow from '@/components/ChatWindow';
-import { MessageSquare as ChatIcon } from 'lucide-react';
+import CheckoutModal from '@/components/CheckoutModal';
+import { MessageSquare as ChatIcon, CreditCard } from 'lucide-react';
 
 interface Booking {
   id: number;
@@ -33,6 +34,8 @@ export default function CustomerDashboard() {
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [jobCount, setJobCount] = useState(0);
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [bookingToPay, setBookingToPay] = useState<any>(null);
 
   const fetchData = async () => {
     const token = localStorage.getItem('token');
@@ -90,6 +93,11 @@ export default function CustomerDashboard() {
         service_title: booking.service_title
     });
     setIsReviewModalOpen(true);
+  };
+
+  const handleOpenCheckout = (booking: any) => {
+    setBookingToPay(booking);
+    setIsCheckoutModalOpen(true);
   };
 
   const StatusBadge = ({ status }: { status: string }) => {
@@ -164,7 +172,7 @@ export default function CustomerDashboard() {
                       <span className="text-xs text-neutral-600 font-bold uppercase tracking-widest">Order #{booking.id}</span>
                     </div>
                     <h3 className="text-2xl font-black text-white group-hover:text-blue-400 transition-colors">
-                      {booking.service_title || "Custom Service"}
+                      {booking.service_details?.title || booking.service_title || "Custom Service"}
                     </h3>
                     <div className="flex flex-wrap gap-6 text-sm text-neutral-500">
                       <div className="flex items-center gap-2">
@@ -180,12 +188,22 @@ export default function CustomerDashboard() {
 
                   <div className="flex items-center gap-4">
                     {booking.status === 'pending' && (
-                      <button 
-                        onClick={() => handleCancelBooking(booking.id)}
-                        className="px-6 py-3 border border-red-500/20 hover:bg-red-500/10 text-red-500 text-sm font-bold rounded-xl transition-all"
-                      >
-                        Cancel Order
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => handleCancelBooking(booking.id)}
+                          className="px-6 py-3 border border-red-500/20 hover:bg-red-500/10 text-red-500 text-sm font-bold rounded-xl transition-all"
+                        >
+                          Cancel
+                        </button>
+                        <button 
+                          onClick={() => handleOpenCheckout(booking)}
+                          className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white text-sm font-black rounded-xl transition-all shadow-lg shadow-blue-600/20 flex items-center gap-2 group"
+                        >
+                          <CreditCard className="w-4 h-4" />
+                          Pay Now
+                          <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                        </button>
+                      </div>
                     )}
                     {booking.status === 'completed' && (
                       <button 
@@ -254,6 +272,17 @@ export default function CustomerDashboard() {
           />
         </div>
       )}
+
+      {/* Checkout Modal */}
+      <CheckoutModal 
+        isOpen={isCheckoutModalOpen}
+        onClose={() => setIsCheckoutModalOpen(false)}
+        booking={bookingToPay}
+        onSuccess={() => {
+          fetchData();
+          setIsCheckoutModalOpen(false);
+        }}
+      />
     </div>
   );
 }
