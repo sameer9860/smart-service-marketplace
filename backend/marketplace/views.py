@@ -4,11 +4,11 @@ from rest_framework import viewsets, permissions, exceptions, filters
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Category, Service, Booking, Job, Bid, Review, Notification, Conversation, Message
+from .models import Category, Service, Booking, Job, Bid, Review, Notification, Conversation, Message, Payment
 from .serializers import (
     CategorySerializer, ServiceSerializer, ServiceListSerializer, BookingSerializer, 
     JobSerializer, JobListSerializer, BidSerializer, ReviewSerializer, NotificationSerializer,
-    MessageSerializer, ConversationSerializer
+    MessageSerializer, ConversationSerializer, PaymentSerializer
 )
 from .permissions import IsOwnerOrReadOnly, IsCustomer, IsProvider
 from .tasks import send_notification_task
@@ -90,6 +90,14 @@ class BookingViewSet(viewsets.ModelViewSet):
         
         # Trigger Notification for Provider
         if booking.service:
+            # Create Payment record
+            Payment.objects.create(
+                booking=booking,
+                amount=booking.service.price,
+                status='pending',
+                transaction_id=f"PENDING-{uuid.uuid4().hex[:8].upper()}"
+            )
+
             # In-app notification
             Notification.objects.create(
                 user=booking.service.provider,
@@ -324,3 +332,46 @@ class MessageViewSet(viewsets.ModelViewSet):
         serializer.save(sender=self.request.user)
         # Update conversation timestamp
         conversation.save() 
+
+import time
+import uuid
+
+class PaymentViewSet(viewsets.ModelViewSet):
+    queryset = Payment.objects.all()
+    serializer_class = PaymentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Payment.objects.filter(booking__user=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def process_payment(self, request, pk=None):
+        payment = self.get_object()
+        
+        if payment.status == 'completed':
+            return Response({"error": "Payment already completed"}, status=400)
+        
+        # Simulate payment gateway processing delay
+        time.sleep(2)
+        
+        # Atomically update payment and booking status
+        with transaction.atomic():
+            payment.status = 'completed'
+            payment.transaction_id = f"MOCK-TXN-{uuid.uuid4().hex[:12].upper()}"
+            payment.save()
+            
+            booking = payment.booking
+            booking.status = 'confirmed' # Move from pending/approved to confirmed
+            booking.save()
+            
+            # Notify Provider
+            Notification.objects.create(
+                user=booking.service.provider,
+                message=f"Payment received for {booking.service.title}. Booking is now confirmed!"
+            )
+
+        return Response({
+            "message": "Payment processed successfully",
+            "transaction_id": payment.transaction_id,
+            "status": payment.status
+        })
