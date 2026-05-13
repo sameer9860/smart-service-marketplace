@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Category, Service, Booking, Job, Bid, Review, Notification, Conversation, Message
+from .models import Category, Service, Booking, Job, Bid, Review, Notification, Conversation, Message, Payment
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -41,14 +41,30 @@ class ServiceListSerializer(serializers.ModelSerializer):
         validated_data['provider'] = self.context['request'].user
         return super().create(validated_data)
 
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = ['id', 'booking', 'amount', 'status', 'transaction_id', 'created_at', 'updated_at']
+        read_only_fields = ['transaction_id', 'status']
+
 class BookingSerializer(serializers.ModelSerializer):
     user_email = serializers.ReadOnlyField(source='user.email')
-    service_title = serializers.ReadOnlyField(source='service.title')
+    service_details = ServiceListSerializer(source='service', read_only=True)
+    provider_details = serializers.SerializerMethodField()
+    payment = PaymentSerializer(read_only=True)
 
     class Meta:
         model = Booking
-        fields = ['id', 'user', 'user_email', 'service', 'service_title', 'status', 'created_at']
+        fields = ['id', 'user', 'user_email', 'service', 'service_details', 'provider_details', 'status', 'payment', 'created_at']
         read_only_fields = ['user', 'status', 'created_at']
+
+    def get_provider_details(self, obj):
+        provider = obj.service.provider
+        return {
+            'id': provider.id,
+            'email': provider.email,
+            'full_name': getattr(provider, 'full_name', ''),
+        }
 
     def create(self, validated_data):
         # Automatically set user to current logged-in user
@@ -161,3 +177,4 @@ class ConversationSerializer(serializers.ModelSerializer):
         if last:
             return MessageSerializer(last).data
         return None
+
