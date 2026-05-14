@@ -37,6 +37,8 @@ export default function PasswordChangeModal({ isOpen, onClose }: PasswordModalPr
         onClose();
         setSuccess(false);
         setFormData({ old_password: '', new_password: '', confirm_password: '' });
+        localStorage.clear();
+        window.location.href = '/login';
       }, 2000);
     } catch (err: any) {
       const data = err.response?.data;

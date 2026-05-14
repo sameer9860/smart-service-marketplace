@@ -61,22 +61,21 @@ export default function ProviderDashboard() {
       }
       
       try {
-        // In a real app, these would be dedicated dashboard endpoints
-        const [servicesRes, bookingsRes] = await [
-           api.get('/marketplace/services/'), // Filtered by provider on backend in real scenario
-           api.get('/marketplace/bookings/')
-        ];
+        const [servicesRes, bookingsRes, jobsRes] = await Promise.all([
+           api.get('/marketplace/services/'),
+           api.get('/marketplace/bookings/'),
+           api.get('/marketplace/jobs/')
+        ]);
         
-        // Mocking some stats for visual representation if actual endpoints aren't specialized yet
+        const myBookings = bookingsRes.data.results || bookingsRes.data;
+        setRecentBookings(myBookings.slice(0, 5));
+        
         setStats({
-          total_earnings: 1250.00,
-          active_services: 5,
-          pending_bookings: 3,
-          total_customers: 12
+          total_earnings: 1250.00, // Still mock for now as we don't have aggregated revenue yet
+          active_services: (servicesRes.data.results || servicesRes.data).length,
+          pending_bookings: myBookings.filter((b: any) => b.status === 'pending').length,
+          total_customers: new Set(myBookings.map((b: any) => b.user_email)).size
         });
-        
-        // We'll set recent bookings from the API response
-        // setRecentBookings(bookingsRes.data.results.slice(0, 5));
       } catch (err) {
         console.error("Dashboard fetch failed", err);
       } finally {
@@ -85,6 +84,26 @@ export default function ProviderDashboard() {
     };
     fetchData();
   }, []);
+
+  const StatusBadge = ({ status, paymentStatus }: { status: string, paymentStatus: string }) => {
+    const styles: any = {
+      pending: "bg-orange-500/10 text-orange-500 border-orange-500/20",
+      confirmed: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+      completed: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+      cancelled: "bg-red-500/10 text-red-500 border-red-500/20",
+    };
+    
+    return (
+      <div className="flex flex-col gap-1.5">
+        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter border text-center ${styles[status] || styles.pending}`}>
+          {status}
+        </span>
+        <span className={`px-3 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-widest text-center border ${paymentStatus === 'paid' ? 'bg-emerald-500/5 text-emerald-500 border-emerald-500/10' : 'bg-neutral-800 text-neutral-500 border-white/5'}`}>
+          {paymentStatus}
+        </span>
+      </div>
+    );
+  };
 
   const StatCard = ({ icon, label, value, trend, color }: any) => (
     <div className="bg-neutral-900/40 backdrop-blur-md border border-white/5 p-8 rounded-3xl group hover:border-blue-500/30 transition-all duration-300">
@@ -170,34 +189,34 @@ export default function ProviderDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {[1, 2, 3].map((i) => (
-                      <tr key={i} className="group hover:bg-white/5 transition-colors">
+                    {recentBookings.length > 0 ? recentBookings.map((booking: any) => (
+                      <tr key={booking.id} className="group hover:bg-white/5 transition-colors">
                         <td className="px-8 py-6">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center text-xs font-bold text-neutral-400">
-                              JD
+                              {booking.user_email.charAt(0).toUpperCase()}
                             </div>
-                            <span className="text-sm font-bold text-white">john.doe@example.com</span>
+                            <span className="text-sm font-bold text-white">{booking.user_email}</span>
                           </div>
                         </td>
                         <td className="px-8 py-6">
-                          <span className="text-sm text-neutral-300 font-medium">Home Cleaning Pro</span>
-                        </td>
-                        <td className="px-8 py-6">
-                          <span className="px-3 py-1 bg-blue-500/10 text-blue-500 text-[10px] font-black rounded-full border border-blue-500/20 uppercase tracking-tighter">
-                            In Progress
+                          <span className="text-sm text-neutral-300 font-medium">
+                            {booking.service_details?.title || "Custom Service"}
                           </span>
                         </td>
+                        <td className="px-8 py-6">
+                           <StatusBadge status={booking.status} paymentStatus={booking.payment_status} />
+                        </td>
                         <td className="px-8 py-6 text-sm text-neutral-500 font-medium">
-                          May 2, 2026
+                          {new Date(booking.created_at).toLocaleDateString()}
                         </td>
                         <td className="px-8 py-6">
                            <div className="flex items-center gap-2">
                              <button 
-                               onClick={() => setActiveConversationId(i)} // For demo, assuming conv ID
-                               className="p-2 hover:bg-blue-600/10 text-neutral-500 hover:text-blue-500 rounded-lg transition-all"
+                                onClick={() => setActiveConversationId(booking.id)}
+                                className="p-2 hover:bg-blue-600/10 text-neutral-500 hover:text-blue-500 rounded-lg transition-all"
                              >
-                               <ChatIcon className="w-4 h-4" />
+                                <ChatIcon className="w-4 h-4" />
                              </button>
                              <button className="p-2 hover:bg-white/10 rounded-lg transition-colors text-neutral-500 hover:text-white">
                                <MoreVertical className="w-4 h-4" />
@@ -205,7 +224,13 @@ export default function ProviderDashboard() {
                            </div>
                         </td>
                       </tr>
-                    ))}
+                    )) : (
+                      <tr>
+                        <td colSpan={5} className="px-8 py-20 text-center text-neutral-500 font-medium">
+                          No recent bookings found.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

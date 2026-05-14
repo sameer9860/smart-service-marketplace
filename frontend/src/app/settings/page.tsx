@@ -49,9 +49,15 @@ export default function SettingsPage() {
 
     try {
       await api.post('/accounts/password/change/', passwordData);
-      setSuccess("Password updated successfully!");
+      setSuccess("Password updated successfully! Redirecting to login...");
       setPasswordData({ old_password: '', new_password: '', confirm_password: '' });
-      fetchLogs(); // Refresh logs to show the change
+      fetchLogs();
+      
+      // Clear storage and redirect
+      setTimeout(() => {
+        localStorage.clear();
+        window.location.href = '/login';
+      }, 2000);
     } catch (err: any) {
       const data = err.response?.data;
       setError(data?.old_password?.[0] || data?.confirm_password?.[0] || "Failed to update password. Please try again.");
