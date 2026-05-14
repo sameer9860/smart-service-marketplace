@@ -79,16 +79,27 @@ class BookingViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         return Booking.objects.filter(
-            models.Q(user=user) | models.Q(service__provider=user)
-        ).select_related('user', 'service').distinct()
+            models.Q(user=user) | 
+            models.Q(service__provider=user) | 
+            models.Q(bid__provider=user)
+        ).select_related('user', 'service', 'bid', 'bid__provider').distinct()
 
     def perform_create(self, serializer):
         booking = serializer.save()
         # Auto-create conversation
         conversation = Conversation.objects.create(booking=booking)
-        conversation.participants.add(self.request.user, booking.service.provider)
         
-        # Trigger Notification for Provider
+        # Determine provider
+        provider = None
+        if booking.service:
+            provider = booking.service.provider
+        elif booking.bid:
+            provider = booking.bid.provider
+
+        if provider:
+            conversation.participants.add(self.request.user, provider)
+        
+        # Trigger Notification and Payment for Service-based bookings
         if booking.service:
             # Create Payment record
             Payment.objects.create(
@@ -112,30 +123,34 @@ class BookingViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def confirm_booking(self, request, pk=None):
         booking = self.get_object()
-        if booking.service.provider != request.user:
-            raise exceptions.PermissionDenied("You are not the provider of this service.")
+        provider = booking.service.provider if booking.service else booking.bid.provider
+        if provider != request.user:
+            raise exceptions.PermissionDenied("You are not the provider of this booking.")
+        
         booking.status = 'confirmed'
         booking.save()
         
-        # Notify Customer
+        title = booking.service.title if booking.service else booking.bid.job.title
         Notification.objects.create(
             user=booking.user,
-            message=f"Your booking for '{booking.service.title}' has been confirmed by the provider."
+            message=f"Your booking for '{title}' has been confirmed by the provider."
         )
         return Response({'status': 'booking confirmed'})
 
     @action(detail=True, methods=['post'])
     def complete_booking(self, request, pk=None):
         booking = self.get_object()
-        if booking.service.provider != request.user:
-            raise exceptions.PermissionDenied("You are not the provider of this service.")
+        provider = booking.service.provider if booking.service else booking.bid.provider
+        if provider != request.user:
+            raise exceptions.PermissionDenied("You are not the provider of this booking.")
+            
         booking.status = 'completed'
         booking.save()
 
-        # Notify Customer
+        title = booking.service.title if booking.service else booking.bid.job.title
         Notification.objects.create(
             user=booking.user,
-            message=f"Service '{booking.service.title}' has been marked as completed. Please leave a review!"
+            message=f"Service '{title}' has been marked as completed. Please leave a review!"
         )
         return Response({'status': 'booking completed'})
 
@@ -252,19 +267,31 @@ class BidViewSet(viewsets.ModelViewSet):
             bid.job.status = 'closed'
             bid.job.save()
             
+            # Create the Booking
             booking = Booking.objects.create(
                 user=bid.job.customer,
-                service=None,
-                status='confirmed'
+                bid=bid,
+                status='pending' # Wait for payment
             )
+            
+            # Create the Payment record automatically
+            Payment.objects.create(
+                booking=booking,
+                amount=bid.amount,
+                status='pending'
+            )
+
+            # Create Conversation for Chat
+            conversation = Conversation.objects.create(booking=booking)
+            conversation.participants.add(bid.job.customer, bid.provider)
             
             # Trigger Notification for winning Provider
             send_notification_task.delay(
                 bid.provider.id,
-                f"Your bid for '{bid.job.title}' has been accepted!"
+                f"Your bid for '{bid.job.title}' has been accepted! Go to your dashboard to start working."
             )
             
-        return Response({'status': 'bid accepted and booking created'})
+        return Response({'status': 'bid accepted, booking and payment record created'})
 
     @action(detail=True, methods=['post'])
     def reject_bid(self, request, pk=None):
