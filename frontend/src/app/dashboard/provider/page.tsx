@@ -201,7 +201,7 @@ export default function ProviderDashboard() {
                         </td>
                         <td className="px-8 py-6">
                           <span className="text-sm text-neutral-300 font-medium">
-                            {booking.service_details?.title || "Custom Service"}
+                            {booking.service_details?.title || "Custom Job Request"}
                           </span>
                         </td>
                         <td className="px-8 py-6">
