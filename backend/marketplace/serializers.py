@@ -53,19 +53,27 @@ class BookingSerializer(serializers.ModelSerializer):
     provider_details = serializers.SerializerMethodField()
     payment = PaymentSerializer(read_only=True)
     payment_status = serializers.ReadOnlyField()
+    bid = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Booking
-        fields = ['id', 'user', 'user_email', 'service', 'service_details', 'provider_details', 'status', 'payment', 'payment_status', 'created_at']
+        fields = ['id', 'user', 'user_email', 'service', 'service_details', 'bid', 'provider_details', 'status', 'payment', 'payment_status', 'created_at']
         read_only_fields = ['user', 'status', 'created_at']
 
     def get_provider_details(self, obj):
-        provider = obj.service.provider
-        return {
-            'id': provider.id,
-            'email': provider.email,
-            'full_name': getattr(provider, 'full_name', ''),
-        }
+        provider = None
+        if obj.service:
+            provider = obj.service.provider
+        elif obj.bid:
+            provider = obj.bid.provider
+            
+        if provider:
+            return {
+                'id': provider.id,
+                'email': provider.email,
+                'full_name': getattr(provider, 'full_name', ''),
+            }
+        return None
 
     def create(self, validated_data):
         # Automatically set user to current logged-in user
