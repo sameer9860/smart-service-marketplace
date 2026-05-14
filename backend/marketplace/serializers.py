@@ -52,10 +52,11 @@ class BookingSerializer(serializers.ModelSerializer):
     service_details = ServiceListSerializer(source='service', read_only=True)
     provider_details = serializers.SerializerMethodField()
     payment = PaymentSerializer(read_only=True)
+    payment_status = serializers.ReadOnlyField()
 
     class Meta:
         model = Booking
-        fields = ['id', 'user', 'user_email', 'service', 'service_details', 'provider_details', 'status', 'payment', 'created_at']
+        fields = ['id', 'user', 'user_email', 'service', 'service_details', 'provider_details', 'status', 'payment', 'payment_status', 'created_at']
         read_only_fields = ['user', 'status', 'created_at']
 
     def get_provider_details(self, obj):
@@ -71,12 +72,26 @@ class BookingSerializer(serializers.ModelSerializer):
         validated_data['user'] = self.context['request'].user
         return super().create(validated_data)
 
+class BidSerializer(serializers.ModelSerializer):
+    provider_email = serializers.ReadOnlyField(source='provider.email')
+    job_title = serializers.ReadOnlyField(source='job.title')
+
+    class Meta:
+        model = Bid
+        fields = ['id', 'job', 'job_title', 'provider', 'provider_email', 'amount', 'message', 'status', 'created_at']
+        read_only_fields = ['provider', 'status', 'created_at']
+
+    def create(self, validated_data):
+        validated_data['provider'] = self.context['request'].user
+        return super().create(validated_data)
+
 class JobSerializer(serializers.ModelSerializer):
     customer_email = serializers.ReadOnlyField(source='customer.email')
+    bids = BidSerializer(many=True, read_only=True)
 
     class Meta:
         model = Job
-        fields = ['id', 'customer', 'customer_email', 'title', 'description', 'budget', 'status', 'created_at']
+        fields = ['id', 'customer', 'customer_email', 'title', 'description', 'budget', 'status', 'bids', 'created_at']
         read_only_fields = ['customer', 'status', 'created_at']
 
     def validate_budget(self, value):
@@ -96,18 +111,6 @@ class JobListSerializer(serializers.ModelSerializer):
         validated_data['customer'] = self.context['request'].user
         return super().create(validated_data)
 
-class BidSerializer(serializers.ModelSerializer):
-    provider_email = serializers.ReadOnlyField(source='provider.email')
-    job_title = serializers.ReadOnlyField(source='job.title')
-
-    class Meta:
-        model = Bid
-        fields = ['id', 'job', 'job_title', 'provider', 'provider_email', 'amount', 'message', 'status', 'created_at']
-        read_only_fields = ['provider', 'status', 'created_at']
-
-    def create(self, validated_data):
-        validated_data['provider'] = self.context['request'].user
-        return super().create(validated_data)
 
 class ReviewSerializer(serializers.ModelSerializer):
     user_email = serializers.ReadOnlyField(source='user.email')

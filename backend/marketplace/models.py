@@ -79,6 +79,12 @@ class Booking(models.Model):
     def __str__(self):
         return f"{self.user.email} - {self.service.title if self.service else 'Job-based'} ({self.status})"
 
+    @property
+    def payment_status(self):
+        if hasattr(self, 'payment') and self.payment.status == 'completed':
+            return 'paid'
+        return 'unpaid'
+
 class Job(models.Model):
     STATUS_CHOICES = [
         ('open', 'Open'),
