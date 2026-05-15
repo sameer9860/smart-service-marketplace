@@ -12,10 +12,11 @@ interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
   booking: any;
+  milestone?: any;
   onSuccess: () => void;
 }
 
-export default function CheckoutModal({ isOpen, onClose, booking, onSuccess }: CheckoutModalProps) {
+export default function CheckoutModal({ isOpen, onClose, booking, milestone, onSuccess }: CheckoutModalProps) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,11 +36,22 @@ export default function CheckoutModal({ isOpen, onClose, booking, onSuccess }: C
     setStep(3); // Processing state
 
     try {
-      // 1. Create payment record (or it might be pre-created by approved booking)
-      // For this mock, we assume the backend handles creation if it doesn't exist
-      // or we just trigger the process action on the payment linked to the booking
+      let paymentId;
       
-      const paymentRes = await api.post(`/marketplace/payments/${booking.payment.id}/process_payment/`);
+      if (milestone) {
+        // 1. Initiate milestone payment (creates/gets Payment object)
+        const initRes = await api.post(`/marketplace/milestones/${milestone.id}/pay/`);
+        paymentId = initRes.data.id;
+      } else {
+        // Standard booking payment
+        paymentId = booking.payment?.id || booking.payments?.[0]?.id;
+      }
+
+      if (!paymentId) {
+        throw new Error("No payment record found for this transaction.");
+      }
+      
+      await api.post(`/marketplace/payments/${paymentId}/process_payment/`);
       
       setStep(4); // Success state
       setTimeout(() => {
@@ -84,17 +96,22 @@ export default function CheckoutModal({ isOpen, onClose, booking, onSuccess }: C
               </div>
 
               <div className="bg-black/30 rounded-3xl border border-white/5 p-6 space-y-4">
+                <div className="flex justify-between items-center text-center">
+                  <span className="text-neutral-500 text-[10px] font-black uppercase tracking-widest w-full">
+                    {milestone ? `Milestone: ${milestone.title}` : `Service: ${booking.service_details?.title || booking.service_title}`}
+                  </span>
+                </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-neutral-500 text-sm font-bold uppercase tracking-widest">Service</span>
-                  <span className="text-white font-black">{booking.service_details?.title || "Professional Service"}</span>
+                  <span className="text-neutral-500 text-sm font-bold uppercase tracking-widest">Project</span>
+                  <span className="text-white font-black">{booking.service_details?.title || booking.service_title}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-neutral-500 text-sm font-bold uppercase tracking-widest">Provider</span>
                   <span className="text-white font-bold">{booking.provider_details?.full_name || booking.provider_email}</span>
                 </div>
                 <div className="pt-4 border-t border-white/5 flex justify-between items-center">
-                  <span className="text-white text-lg font-black">Total Amount</span>
-                  <span className="text-blue-500 text-2xl font-black">${booking.service_details?.price || booking.price}</span>
+                  <span className="text-white text-lg font-black">{milestone ? 'Milestone Amount' : 'Total Amount'}</span>
+                  <span className="text-blue-500 text-2xl font-black">${milestone ? milestone.amount : (booking.service_details?.price || booking.price)}</span>
                 </div>
               </div>
 
@@ -181,7 +198,7 @@ export default function CheckoutModal({ isOpen, onClose, booking, onSuccess }: C
                   onClick={handleProcessPayment}
                   className="flex-1 py-5 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-2xl shadow-xl shadow-blue-600/20 transition-all flex items-center justify-center gap-2"
                 >
-                  Pay ${booking.service_details?.price || booking.price}
+                  Pay ${milestone ? milestone.amount : (booking.service_details?.price || booking.price)}
                 </button>
               </div>
             </div>
