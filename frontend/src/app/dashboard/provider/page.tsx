@@ -10,8 +10,8 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
-import ChatWindow from '@/components/ChatWindow';
-import { MessageSquare as ChatIcon } from 'lucide-react';
+import { MessageSquare as ChatIcon, Briefcase } from 'lucide-react';
+import MilestoneManager from '@/components/MilestoneManager';
 
 interface Stats {
   total_earnings: number;
@@ -38,6 +38,7 @@ export default function ProviderDashboard() {
   });
   const [recentBookings, setRecentBookings] = useState<RecentBooking[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
+  const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -83,7 +84,17 @@ export default function ProviderDashboard() {
       }
     };
     fetchData();
-  }, []);
+  }, [router]);
+
+  const refreshBooking = async () => {
+    if (!selectedBooking) return;
+    try {
+      const res = await api.get(`/marketplace/bookings/${selectedBooking.id}/`);
+      setSelectedBooking(res.data);
+    } catch (err) {
+      console.error("Failed to refresh booking", err);
+    }
+  };
 
   const StatusBadge = ({ status, paymentStatus }: { status: string, paymentStatus: string }) => {
     const styles: any = {
@@ -218,6 +229,13 @@ export default function ProviderDashboard() {
                              >
                                 <ChatIcon className="w-4 h-4" />
                              </button>
+                             <button 
+                                onClick={() => setSelectedBooking(booking)}
+                                className="p-2 hover:bg-white/10 rounded-lg transition-colors text-neutral-500 hover:text-white group-hover:text-blue-400"
+                                title="Manage Milestones"
+                             >
+                               <Briefcase className="w-4 h-4" />
+                             </button>
                              <button className="p-2 hover:bg-white/10 rounded-lg transition-colors text-neutral-500 hover:text-white">
                                <MoreVertical className="w-4 h-4" />
                              </button>
@@ -273,6 +291,41 @@ export default function ProviderDashboard() {
           </div>
         </div>
       </main>
+
+       {/* Slide-over Project Management */}
+      {selectedBooking && (
+        <div className="fixed inset-0 z-[60] flex justify-end">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedBooking(null)}></div>
+          <div className="relative w-full max-w-2xl bg-black border-l border-white/10 h-full overflow-y-auto animate-in slide-in-from-right duration-500">
+             <div className="p-8 space-y-8">
+                <div className="flex justify-between items-center">
+                   <div>
+                      <h2 className="text-3xl font-black tracking-tighter">Project Management</h2>
+                      <p className="text-neutral-500 text-sm">{selectedBooking.user_email}'s Project</p>
+                   </div>
+                   <button 
+                     onClick={() => setSelectedBooking(null)}
+                     className="p-3 bg-white/5 hover:bg-white/10 rounded-full transition-colors"
+                   >
+                     <XCircle className="w-6 h-6" />
+                   </button>
+                </div>
+
+                <div className="p-6 bg-blue-600 rounded-3xl shadow-xl shadow-blue-600/20">
+                   <p className="text-blue-100 text-xs font-bold uppercase tracking-widest mb-1">Total Project Budget</p>
+                   <h3 className="text-4xl font-black text-white">${selectedBooking.bid_details?.amount || selectedBooking.service_details?.price || '0.00'}</h3>
+                </div>
+
+                <MilestoneManager 
+                  bookingId={selectedBooking.id}
+                  totalAmount={Number(selectedBooking.bid_details?.amount || selectedBooking.service_details?.price || 0)}
+                  existingMilestones={selectedBooking.milestones || []}
+                  onUpdate={refreshBooking}
+                />
+             </div>
+          </div>
+        </div>
+      )}
 
       {/* Slide-over Chat */}
       {activeConversationId && (
