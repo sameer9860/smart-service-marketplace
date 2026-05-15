@@ -158,10 +158,19 @@ class Review(models.Model):
         on_delete=models.CASCADE,
         related_name='reviews'
     )
+    booking = models.OneToOneField(
+        'Booking',
+        on_delete=models.CASCADE,
+        related_name='review',
+        null=True, # Temporarily null for migration if needed
+        blank=True
+    )
     service = models.ForeignKey(
         Service,
         on_delete=models.CASCADE,
-        related_name='reviews'
+        related_name='reviews',
+        null=True,
+        blank=True
     )
     rating = models.IntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(5)]
@@ -171,10 +180,12 @@ class Review(models.Model):
 
     class Meta:
         ordering = ['-created_at']
-        unique_together = ['user', 'service']
+        # Each user can review a specific booking once
+        # Note: OneToOneField already ensures uniqueness per booking
 
     def __str__(self):
-        return f"Review by {self.user.email} for {self.service.title}"
+        title = self.booking.service.title if (self.booking and self.booking.service) else "Custom Job"
+        return f"Review by {self.user.email} for {title}"
 
 class Notification(models.Model):
     user = models.ForeignKey(
@@ -241,6 +252,29 @@ class Message(models.Model):
     def __str__(self):
         return f"From {self.sender.email} at {self.created_at}"
 
+class Milestone(models.Model):
+    MILESTONE_STATUS = (
+        ('pending', 'Pending'),
+        ('paid', 'Paid'),
+        ('completed', 'Completed'),
+    )
+    
+    booking = models.ForeignKey(
+        Booking,
+        on_delete=models.CASCADE,
+        related_name='milestones'
+    )
+    title = models.CharField(max_length=255)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=20, choices=MILESTONE_STATUS, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.title} - {self.amount}"
+
 class Payment(models.Model):
     PAYMENT_STATUS = (
         ('pending', 'Pending'),
@@ -249,10 +283,17 @@ class Payment(models.Model):
         ('refunded', 'Refunded'),
     )
     
-    booking = models.OneToOneField(Booking, on_delete=models.CASCADE, related_name='payment')
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='payments')
+    milestone = models.ForeignKey(
+        Milestone,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='payments'
+    )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=20, choices=PAYMENT_STATUS, default='pending')
-    transaction_id = models.CharField(max_length=100, unique=True)
+    transaction_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
