@@ -40,7 +40,7 @@ export default function ReviewModal({ isOpen, onClose, booking }: ReviewModalPro
     
     try {
       await api.post('/marketplace/reviews/', {
-        service: booking.service_id,
+        booking: booking.id,
         rating: rating,
         comment: comment
       });
@@ -92,7 +92,7 @@ export default function ReviewModal({ isOpen, onClose, booking }: ReviewModalPro
             <form onSubmit={handleSubmit} className="space-y-8">
               <div className="text-center space-y-4">
                 <p className="text-sm font-bold text-neutral-500 uppercase tracking-widest">
-                  How was your service for <span className="text-white">{booking.service_title}</span>?
+                  How was your experience with <span className="text-white">{booking.service_title}</span>?
                 </p>
                 <div className="flex justify-center gap-2">
                   {[1, 2, 3, 4, 5].map((star) => (
