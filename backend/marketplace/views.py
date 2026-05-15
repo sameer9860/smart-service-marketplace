@@ -303,23 +303,11 @@ class BidViewSet(viewsets.ModelViewSet):
         return Response({'status': 'bid rejected'})
 
 class ReviewViewSet(viewsets.ModelViewSet):
-    queryset = Review.objects.select_related('user', 'service').all()
+    queryset = Review.objects.select_related('user', 'service', 'booking').all()
     serializer_class = ReviewSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def perform_create(self, serializer):
-        user = self.request.user
-        service = serializer.validated_data['service']
-        
-        has_completed_booking = Booking.objects.filter(
-            user=user,
-            service=service,
-            status='completed'
-        ).exists()
-        
-        if not has_completed_booking:
-            raise exceptions.ValidationError("You can only review services you have successfully completed.")
-            
         serializer.save()
 
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
@@ -369,7 +357,12 @@ class PaymentViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Payment.objects.filter(booking__user=self.request.user)
+        user = self.request.user
+        return Payment.objects.filter(
+            models.Q(booking__user=user) | 
+            models.Q(booking__service__provider=user) | 
+            models.Q(booking__bid__provider=user)
+        ).distinct()
 
     @action(detail=True, methods=['post'])
     def process_payment(self, request, pk=None):
@@ -378,27 +371,68 @@ class PaymentViewSet(viewsets.ModelViewSet):
         if payment.status == 'completed':
             return Response({"error": "Payment already completed"}, status=400)
         
+        if payment.booking.user != request.user:
+            raise exceptions.PermissionDenied("You are not the customer for this payment.")
+
         # Simulate payment gateway processing delay
-        time.sleep(2)
+        time.sleep(1)
         
-        # Atomically update payment and booking status
+        # Atomically update payment and statuses
         with transaction.atomic():
             payment.status = 'completed'
-            payment.transaction_id = f"MOCK-TXN-{uuid.uuid4().hex[:12].upper()}"
+            payment.transaction_id = f"PAY-{uuid.uuid4().hex[:12].upper()}"
             payment.save()
             
-            booking = payment.booking
-            booking.status = 'confirmed' # Move from pending/approved to confirmed
-            booking.save()
+            if payment.milestone:
+                payment.milestone.status = 'paid'
+                payment.milestone.save()
             
-            # Notify Provider
-            Notification.objects.create(
-                user=booking.service.provider,
-                message=f"Payment received for {booking.service.title}. Booking is now confirmed!"
-            )
+            booking = payment.booking
+            if booking.status == 'pending':
+                booking.status = 'confirmed'
+                booking.save()
+            
+        return Response({'status': 'payment processed successfully', 'transaction_id': payment.transaction_id})
 
-        return Response({
-            "message": "Payment processed successfully",
-            "transaction_id": payment.transaction_id,
-            "status": payment.status
-        })
+class MilestoneViewSet(viewsets.ModelViewSet):
+    queryset = Milestone.objects.all()
+    serializer_class = MilestoneSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return Milestone.objects.filter(
+            models.Q(booking__user=user) | 
+            models.Q(booking__service__provider=user) | 
+            models.Q(booking__bid__provider=user)
+        ).distinct()
+
+    def perform_create(self, serializer):
+        booking = serializer.validated_data['booking']
+        provider = booking.service.provider if booking.service else booking.bid.provider
+        
+        if provider != self.request.user:
+            raise exceptions.PermissionDenied("Only the provider can create milestones.")
+            
+        serializer.save()
+
+    @action(detail=True, methods=['post'])
+    def pay(self, request, pk=None):
+        milestone = self.get_object()
+        booking = milestone.booking
+        
+        if booking.user != request.user:
+            raise exceptions.PermissionDenied("You are not the customer for this booking.")
+            
+        if milestone.status != 'pending':
+            return Response({"error": "Milestone is already paid or completed"}, status=400)
+            
+        # Create or get pending payment for this milestone
+        payment, created = Payment.objects.get_or_create(
+            booking=booking,
+            milestone=milestone,
+            status='pending',
+            defaults={'amount': milestone.amount}
+        )
+        
+        return Response(PaymentSerializer(payment).data)
