@@ -1,5 +1,4 @@
-from rest_framework import serializers
-from .models import Category, Service, Booking, Job, Bid, Review, Notification, Conversation, Message, Payment
+from .models import Category, Service, Booking, Job, Bid, Review, Notification, Conversation, Message, Payment, Milestone
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -41,23 +40,34 @@ class ServiceListSerializer(serializers.ModelSerializer):
         validated_data['provider'] = self.context['request'].user
         return super().create(validated_data)
 
+class MilestoneSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Milestone
+        fields = ['id', 'booking', 'title', 'amount', 'status', 'created_at']
+        read_only_fields = ['status', 'created_at']
+
 class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
-        fields = ['id', 'booking', 'amount', 'status', 'transaction_id', 'created_at', 'updated_at']
+        fields = ['id', 'booking', 'milestone', 'amount', 'status', 'transaction_id', 'created_at', 'updated_at']
         read_only_fields = ['transaction_id', 'status']
 
 class BookingSerializer(serializers.ModelSerializer):
     user_email = serializers.ReadOnlyField(source='user.email')
     service_details = ServiceListSerializer(source='service', read_only=True)
     provider_details = serializers.SerializerMethodField()
-    payment = PaymentSerializer(read_only=True)
+    payments = PaymentSerializer(many=True, read_only=True)
+    milestones = MilestoneSerializer(many=True, read_only=True)
     payment_status = serializers.ReadOnlyField()
     bid = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Booking
-        fields = ['id', 'user', 'user_email', 'service', 'service_details', 'bid', 'provider_details', 'status', 'payment', 'payment_status', 'created_at']
+        fields = [
+            'id', 'user', 'user_email', 'service', 'service_details', 
+            'bid', 'provider_details', 'status', 'payments', 'milestones', 
+            'payment_status', 'created_at'
+        ]
         read_only_fields = ['user', 'status', 'created_at']
 
     def get_provider_details(self, obj):
@@ -125,27 +135,28 @@ class ReviewSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Review
-        fields = ['id', 'user', 'user_email', 'service', 'rating', 'comment', 'created_at']
-        read_only_fields = ['user', 'created_at']
+        fields = ['id', 'user', 'user_email', 'booking', 'service', 'rating', 'comment', 'created_at']
+        read_only_fields = ['user', 'service', 'created_at']
 
     def validate(self, data):
         user = self.context['request'].user
-        service = data['service']
+        booking = data['booking']
         
-        from .models import Booking
-        has_completed_booking = Booking.objects.filter(
-            user=user,
-            service=service,
-            status='completed'
-        ).exists()
-        
-        if not has_completed_booking:
+        if booking.user != user:
+            raise serializers.ValidationError("You can only review your own bookings.")
+            
+        if booking.status != 'completed':
             raise serializers.ValidationError("You can only review services you have successfully completed.")
+            
+        if hasattr(booking, 'review'):
+            raise serializers.ValidationError("You have already reviewed this booking.")
             
         return data
 
     def create(self, validated_data):
+        booking = validated_data['booking']
         validated_data['user'] = self.context['request'].user
+        validated_data['service'] = booking.service # May be None for custom jobs
         return super().create(validated_data)
 
 class NotificationSerializer(serializers.ModelSerializer):
