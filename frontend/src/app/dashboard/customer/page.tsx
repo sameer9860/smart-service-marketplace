@@ -37,6 +37,7 @@ export default function CustomerDashboard() {
   const [loading, setLoading] = useState(true);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [bookingToPay, setBookingToPay] = useState<any>(null);
+  const [milestoneToPay, setMilestoneToPay] = useState<any>(null);
 
   const fetchData = async () => {
     const token = localStorage.getItem('token');
@@ -106,8 +107,9 @@ export default function CustomerDashboard() {
     setIsReviewModalOpen(true);
   };
 
-  const handleOpenCheckout = (booking: any) => {
+  const handleOpenCheckout = (booking: any, milestone?: any) => {
     setBookingToPay(booking);
+    setMilestoneToPay(milestone || null);
     setIsCheckoutModalOpen(true);
   };
 
@@ -247,21 +249,55 @@ export default function CustomerDashboard() {
                   </div>
 
                   {booking.status !== 'cancelled' && (
-                    <div className="mt-8 pt-8 border-t border-white/5">
-                      <div className="relative h-2 bg-white/5 rounded-full overflow-hidden">
-                        <div 
-                          className={`absolute top-0 left-0 h-full transition-all duration-1000 ${
-                            booking.status === 'pending' ? 'w-1/3 bg-orange-500' :
-                            booking.status === 'confirmed' ? 'w-2/3 bg-blue-500' :
-                            'w-full bg-emerald-500'
-                          }`}
-                        />
+                    <div className="mt-8 pt-8 border-t border-white/5 space-y-6">
+                      {/* Progress Bar */}
+                      <div className="space-y-4">
+                        <div className="relative h-2 bg-white/5 rounded-full overflow-hidden">
+                          <div 
+                            className={`absolute top-0 left-0 h-full transition-all duration-1000 ${
+                              booking.status === 'pending' ? 'w-1/3 bg-orange-500' :
+                              booking.status === 'confirmed' ? 'w-2/3 bg-blue-500' :
+                              'w-full bg-emerald-500'
+                            }`}
+                          />
+                        </div>
+                        <div className="flex justify-between">
+                          <div className={`text-[10px] font-black uppercase tracking-widest ${booking.status === 'pending' ? 'text-orange-500' : 'text-neutral-700'}`}>Requested</div>
+                          <div className={`text-[10px] font-black uppercase tracking-widest ${booking.status === 'confirmed' ? 'text-blue-500' : 'text-neutral-700'}`}>In Progress</div>
+                          <div className={`text-[10px] font-black uppercase tracking-widest ${booking.status === 'completed' ? 'text-emerald-500' : 'text-neutral-700'}`}>Delivered</div>
+                        </div>
                       </div>
-                      <div className="flex justify-between mt-4">
-                        <div className={`text-[10px] font-black uppercase tracking-widest ${booking.status === 'pending' ? 'text-orange-500' : 'text-neutral-700'}`}>Requested</div>
-                        <div className={`text-[10px] font-black uppercase tracking-widest ${booking.status === 'confirmed' ? 'text-blue-500' : 'text-neutral-700'}`}>In Progress</div>
-                        <div className={`text-[10px] font-black uppercase tracking-widest ${booking.status === 'completed' ? 'text-emerald-500' : 'text-neutral-700'}`}>Delivered</div>
-                      </div>
+
+                      {/* Milestones Section */}
+                      {booking.milestones && booking.milestones.length > 0 && (
+                        <div className="bg-black/20 rounded-2xl p-6 space-y-4">
+                          <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Project Milestones</h4>
+                          <div className="space-y-3">
+                            {booking.milestones.map((m: any) => (
+                              <div key={m.id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                                <div className="flex items-center gap-3">
+                                  {m.status === 'paid' ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Clock className="w-4 h-4 text-neutral-600" />}
+                                  <span className="text-sm font-bold text-white">{m.title}</span>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                  <span className="text-sm font-black text-white">${m.amount}</span>
+                                  {m.status === 'pending' && (
+                                    <button 
+                                      onClick={() => handleOpenCheckout(booking, m)}
+                                      className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-black rounded-lg transition-all"
+                                    >
+                                      Pay Now
+                                    </button>
+                                  )}
+                                  {m.status === 'paid' && (
+                                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Paid</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -372,9 +408,11 @@ export default function CustomerDashboard() {
         isOpen={isCheckoutModalOpen}
         onClose={() => setIsCheckoutModalOpen(false)}
         booking={bookingToPay}
+        milestone={milestoneToPay}
         onSuccess={() => {
           fetchData();
           setIsCheckoutModalOpen(false);
+          setMilestoneToPay(null);
         }}
       />
     </div>
